@@ -12,6 +12,7 @@ import TicTacToe from "./tictactoe";
 import SeaBattle from "./seaBattle";
 import Profile from "./profile";
 import AppHeader from "./header";
+import Welcome from "./hello";
 const { Sider, Content } = Layout;
 
 const menuItems: MenuProps["items"] = [
@@ -38,7 +39,7 @@ const App: React.FC = () => {
 		<Router>
 			<Layout style={{ minHeight: "100vh" }}>
 				<Sider breakpoint="lg" collapsedWidth="0">
-					<div>LOGO</div>
+					<img src="logo512.png" style={{ height: 40, width: 40 }} alt="logo" />
 					<SideMenu />
 				</Sider>
 				<Layout>
@@ -48,6 +49,7 @@ const App: React.FC = () => {
 							<Route path="/tictactoe" element={<TicTacToe />} />
 							<Route path="/seabattle" element={<SeaBattle />} />
 							<Route path="/profile" element={<Profile />} />
+							<Route path="/" element={<Welcome />} />
 						</Routes>
 					</Content>
 				</Layout>
