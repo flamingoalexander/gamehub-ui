@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
-import App from "./components/App";
+import App from "./bootstrap/App";
 import { ConfigProvider } from "antd";
 const root = ReactDOM.createRoot(
 	document.getElementById("root") as HTMLElement,
@@ -35,10 +35,9 @@ const themeToken = {
 	},
 };
 
-export default themeToken;
 root.render(
 	<React.StrictMode>
-		<ConfigProvider theme={themeToken}>
+		<ConfigProvider>
 			<App />
 		</ConfigProvider>
 	</React.StrictMode>,
