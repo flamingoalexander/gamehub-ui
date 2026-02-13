@@ -1,20 +1,19 @@
-import React from "react";
-import { Route, Routes } from "react-router-dom";
+import React, { FC, useState } from "react";
+import { Navigate, Outlet } from "react-router-dom";
 import { Layout } from "antd";
 import SideMenu from "../components/sideMenu";
-import Profile from "../components/profile";
-import SeaBattle from "../components/seaBattle";
-import TicTacToe from "../components/tictactoe";
-import Welcome from "../components/hello";
 import { Content } from "antd/es/layout/layout";
 import AppHeader from "../components/header";
 import Logo from "../components/logo";
 import Sider from "antd/es/layout/Sider";
-import AuthorizationForm from "./auth";
+import { useAuth } from "../@providers/auth";
 
-const MainPage: React.FC = () => {
-	const [collapsed, setCollapsed] = React.useState(false);
-
+const MainPage: FC = () => {
+	const [collapsed, setCollapsed] = useState(false);
+	const { isAuthenticated } = useAuth();
+	if (!isAuthenticated) {
+		return <Navigate to="/login" replace />;
+	}
 	return (
 		<Layout style={{ minHeight: "100vh" }}>
 			<Sider
@@ -40,13 +39,7 @@ const MainPage: React.FC = () => {
 						background: "#fff",
 					}}
 				>
-					<Routes>
-						<Route path="/" element={<Welcome />} />
-						<Route path="/tictactoe" element={<TicTacToe />} />
-						<Route path="/seabattle" element={<SeaBattle />} />
-						<Route path="/profile" element={<Profile />} />
-						<Route path="/login" element={<AuthorizationForm />} />
-					</Routes>
+					<Outlet />
 				</Content>
 			</Layout>
 		</Layout>

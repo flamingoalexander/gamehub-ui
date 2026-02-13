@@ -1,5 +1,5 @@
 import React from "react";
-import { Form, Input, Button, Typography, Space } from "antd";
+import { Form, Input, Button, Typography, Space, Card, Flex } from "antd";
 import {
 	MailOutlined,
 	LockOutlined,
@@ -7,84 +7,79 @@ import {
 	GlobalOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../bootstrap/App";
+import { useAuth } from "../@providers/auth";
 
 const { Title, Text } = Typography;
 
 const AuthorizationForm = () => {
-	const { login, isAuthenticated } = useAuth();
+	const { login } = useAuth();
 	const navigate = useNavigate();
 	const onFinish = () => {
 		login();
-		console.log(isAuthenticated);
 		navigate("/");
 	};
 
 	return (
-		<div
-			style={{
-				maxWidth: 400,
-				margin: "auto",
-				padding: 20,
-				border: "1px solid #d9d9d9",
-				borderRadius: 8,
-			}}
-		>
-			<Title level={2} style={{ textAlign: "center" }}>
-				Авторизация
-			</Title>
-			<Form name="authorization" onFinish={onFinish} layout="vertical">
-				<Form.Item
-					label="Электронная почта *"
-					name="email"
-					rules={[{ required: true, message: "Введите электронную почту" }]}
+		<Flex justify="center" align={"center"} style={{ height: "70vh" }}>
+			<Card>
+				<Title level={2} style={{ textAlign: "center" }}>
+					Авторизация
+				</Title>
+				<Form name="authorization" onFinish={onFinish} layout="vertical">
+					<Form.Item
+						label="Электронная почта *"
+						name="email"
+						rules={[{ required: true, message: "Введите электронную почту" }]}
+					>
+						<Input
+							prefix={<MailOutlined />}
+							placeholder="Введите электронную почту"
+						/>
+					</Form.Item>
+					<Form.Item
+						label="Пароль *"
+						name="password"
+						rules={[{ required: true, message: "Введите пароль" }]}
+					>
+						<Input.Password prefix={<LockOutlined />} placeholder="********" />
+					</Form.Item>
+					<Form.Item>
+						<Button type="primary" htmlType="submit" block>
+							Авторизоваться
+						</Button>
+					</Form.Item>
+				</Form>
+				<Text
+					style={{ display: "block", textAlign: "center", marginBottom: 16 }}
 				>
-					<Input
-						prefix={<MailOutlined />}
-						placeholder="Введите электронную почту"
-					/>
-				</Form.Item>
-				<Form.Item
-					label="Пароль *"
-					name="password"
-					rules={[{ required: true, message: "Введите пароль" }]}
-				>
-					<Input.Password prefix={<LockOutlined />} placeholder="********" />
-				</Form.Item>
-				<Form.Item>
-					<Button type="primary" htmlType="submit" block>
-						Авторизоваться
+					Забыли пароль?
+				</Text>
+				<Space orientation="vertical" style={{ width: "100%" }}>
+					<Button
+						icon={<GoogleOutlined />}
+						block
+						onClick={() => console.log("Google login placeholder")}
+					>
+						Войти через аккаунт Google
 					</Button>
-				</Form.Item>
-			</Form>
-			<Text style={{ display: "block", textAlign: "center", marginBottom: 16 }}>
-				Забыли пароль?
-			</Text>
-			<Space orientation="vertical" style={{ width: "100%" }}>
+					<Button
+						icon={<GlobalOutlined />}
+						block
+						onClick={() => console.log("Other service login placeholder")}
+					>
+						Войти через аккаунт другого сервиса
+					</Button>
+				</Space>
 				<Button
-					icon={<GoogleOutlined />}
+					type="link"
 					block
-					onClick={() => console.log("Google login placeholder")}
+					style={{ marginTop: 16 }}
+					onClick={() => console.log("Registration placeholder")}
 				>
-					Войти через аккаунт Google
+					Регистрация &gt;
 				</Button>
-				<Button
-					icon={<GlobalOutlined />}
-					block
-					onClick={() => console.log("Other service login placeholder")}
-				>
-					Войти через аккаунт другого сервиса
-				</Button>
-			</Space>
-			<Button
-				type="link"
-				block
-				style={{ marginTop: 16 }}
-				onClick={() => console.log("Registration placeholder")}
-			>
-				Регистрация &gt;
-			</Button>
-		</div>
+			</Card>
+		</Flex>
 	);
 };
 
