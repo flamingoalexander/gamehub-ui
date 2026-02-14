@@ -5,8 +5,8 @@ import TicTacToe from "../components/tictactoe";
 import Profile from "../components/profile";
 import AuthorizationForm from "../pages/auth";
 import MainPage from "../pages/main";
-import FriendsPage from "../components/friends";
 import AchievementsPage from "../components/achievements";
+import Leaderboard from "../components/leaderboard";
 
 const App = () => {
 	return (
@@ -18,8 +18,8 @@ const App = () => {
 				<Route path="/seabattle" element={<SeaBattle />} />
 				<Route path="/profile" element={<Profile />} />
 				<Route path="/login" element={<AuthorizationForm />} />
-				<Route path="/friends" element={<FriendsPage/>} />
 				<Route path="/achievements" element={<AchievementsPage />} />
+				<Route path="/leaderboard" element={<Leaderboard />} />
 			</Route>
 
 			<Route path="*" element={<Navigate to="/" replace />} />

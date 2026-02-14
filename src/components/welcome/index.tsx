@@ -23,11 +23,22 @@ const Welcome: FC = () => {
 
 				<Col xs={24} sm={12}>
 					<Link to="/seabattle" style={{ display: "block" }}>
-						<Card hoverable style={{ height: "100%" }}>
-							<Title level={4} style={{ marginBottom: 8 }}>
+						<Card
+							hoverable
+							style={{
+								height: 220,
+								color: "#fff",
+								border: 0,
+								overflow: "hidden",
+								backgroundImage: `linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,.2)), url(${"korabli.jpg"})`,
+								backgroundSize: "cover",
+								backgroundPosition: "center",
+							}}
+						>
+							<Title level={4} style={{ marginBottom: 8, color: "#fff" }}>
 								Морской бой
 							</Title>
-							<Text type="secondary">Играть</Text>
+							<Text style={{ color: "rgba(255,255,255,.85)" }}>Играть</Text>
 						</Card>
 					</Link>
 				</Col>

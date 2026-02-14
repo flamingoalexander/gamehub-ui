@@ -1,26 +1,31 @@
 import { Menu, MenuProps } from "antd";
-import {
-	DashboardOutlined,
-	HomeOutlined,
-	UserOutlined,
-} from "@ant-design/icons";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import React from "react";
-
-const menuItems: MenuProps["items"] = [
+import {
+	HomeOutlined,
+	IdcardOutlined,
+	TrophyOutlined,
+	StarOutlined,
+} from "@ant-design/icons";
+export const menuItems: MenuProps["items"] = [
 	{
 		key: "/",
 		icon: <HomeOutlined />,
 		label: <Link to="/">Главная</Link>,
 	},
 	{
-		key: "/friends",
-		icon: <DashboardOutlined />,
-		label: <Link to="/friends">Друзья</Link>,
+		key: "/profile",
+		icon: <IdcardOutlined />,
+		label: <Link to="/profile">Профиль</Link>,
+	},
+	{
+		key: "/leaderboard",
+		icon: <TrophyOutlined />,
+		label: <Link to="/leaderboard">Таблица лидеров</Link>,
 	},
 	{
 		key: "/achievements",
-		icon: <UserOutlined />,
+		icon: <StarOutlined />,
 		label: <Link to="/achievements">Достижения</Link>,
 	},
 ];
