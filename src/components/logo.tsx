@@ -27,7 +27,6 @@ const Logo: React.FC<{ collapsed: boolean }> = ({ collapsed }) => (
 				<Title
 					level={5}
 					style={{
-						color: "white",
 						margin: 0,
 						whiteSpace: "nowrap",
 					}}

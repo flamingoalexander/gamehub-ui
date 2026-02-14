@@ -3,7 +3,6 @@ import { Header } from "antd/es/layout/layout";
 import { Flex } from "antd";
 import Title from "antd/es/typography/Title";
 
-
 const AppHeader: FC = () => {
 	return (
 		<Header>

@@ -36,7 +36,6 @@ const MainPage: FC = () => {
 						padding: 24,
 						minHeight: 280,
 						borderRadius: 8,
-						background: "#fff",
 					}}
 				>
 					<Outlet />

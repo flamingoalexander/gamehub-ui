@@ -94,7 +94,6 @@ const Battleship: React.FC = () => {
 										? "#52c41a"
 										: "#ff4d4f"
 									: "#1890ff",
-								color: "#fff",
 								fontWeight: "bold",
 							}}
 						>
