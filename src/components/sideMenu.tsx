@@ -14,14 +14,14 @@ const menuItems: MenuProps["items"] = [
 		label: <Link to="/">Главная</Link>,
 	},
 	{
-		key: "/tictactoe",
+		key: "/friends",
 		icon: <DashboardOutlined />,
-		label: <Link to="/tictactoe">Крестики-нолики</Link>,
+		label: <Link to="/friends">Друзья</Link>,
 	},
 	{
-		key: "/seabattle",
+		key: "/achievements",
 		icon: <UserOutlined />,
-		label: <Link to="/seabattle">Морской бой</Link>,
+		label: <Link to="/achievements">Достижения</Link>,
 	},
 ];
 
