@@ -7,8 +7,8 @@ import WinnerChecker from "./scripts/TicTacToe/WinnerChecker";
 import TicTacToeBot from "./scripts/TicTacToe/TicTacToeBot"; // бот поддерживается только для 3x3
 import TicTacToeChars from "./scripts/TicTacToe/TicTacToeCharsEnum";
 import Point from "./scripts/TicTacToe/Point"
-import Column from "antd/es/table/Column";
 import GameStates from "./scripts/TicTacToe/TicTacToeGameStates";
+import DrawWinLine from "./WinLine";
 
 const TicTacToe: React.FC = () => {
   // Настройки
@@ -27,8 +27,75 @@ const TicTacToe: React.FC = () => {
   const [currentPlayer, setCurrentPlayer] = useState<TicTacToePlayer>();
 
   const [board, setBoard] = useState<TicTacToeChars[]>([]);
+  const [winningLine, setWinningLine] = useState<Point[] | null>(null);
 
   const cellSize = Math.max(50, Math.floor(480 / size));
+
+  // Функция для поиска выигрышной линии
+  const findWinningLine = (
+    field: TicTacToeChars[][],
+    symbol: TicTacToeChars,
+    winLength: number,
+    size: number
+  ): Point[] | null => {
+    // Проверка рядов
+    for (let row = 0; row < size; row++) {
+      for (let col = 0; col <= size - winLength; col++) {
+        let count = 0;
+        for (let k = 0; k < winLength; k++) {
+          if (field[row][col + k] === symbol) count++;
+          else break;
+        }
+        if (count === winLength) {
+          return Array.from({ length: winLength }, (_, k) => new Point(row, col + k));
+        }
+      }
+    }
+
+    // Проверка столбцов
+    for (let col = 0; col < size; col++) {
+      for (let row = 0; row <= size - winLength; row++) {
+        let count = 0;
+        for (let k = 0; k < winLength; k++) {
+          if (field[row + k][col] === symbol) count++;
+          else break;
+        }
+        if (count === winLength) {
+          return Array.from({ length: winLength }, (_, k) => new Point(row + k, col));
+        }
+      }
+    }
+
+    // Проверка диагоналей (\)
+    for (let row = 0; row <= size - winLength; row++) {
+      for (let col = 0; col <= size - winLength; col++) {
+        let count = 0;
+        for (let k = 0; k < winLength; k++) {
+          if (field[row + k][col + k] === symbol) count++;
+          else break;
+        }
+        if (count === winLength) {
+          return Array.from({ length: winLength }, (_, k) => new Point(row + k, col + k));
+        }
+      }
+    }
+
+    // Проверка антидиагоналей (/)
+    for (let row = 0; row <= size - winLength; row++) {
+      for (let col = winLength - 1; col < size; col++) {
+        let count = 0;
+        for (let k = 0; k < winLength; k++) {
+          if (field[row + k][col - k] === symbol) count++;
+          else break;
+        }
+        if (count === winLength) {
+          return Array.from({ length: winLength }, (_, k) => new Point(row + k, col - k));
+        }
+      }
+    }
+
+    return null;
+  };
 
   // Инициализация игры
   const initGame = (newSize: number, newWinLength: number, playVsBot: boolean) => {
@@ -59,6 +126,7 @@ const TicTacToe: React.FC = () => {
     setBot(botInstance);
     setCurrentPlayer(pX);
     setBoard(newField.flat());
+    setWinningLine(null);
 
     setSize(newSize);
     setWinLength(newWinLength);
@@ -100,6 +168,15 @@ const TicTacToe: React.FC = () => {
     setBoard(game.getFieldCopy().flat());
     setCurrentPlayer(currentPlayer === playerX ? playerO : playerX);
   };
+
+  // Определение выигрышной линии после обновления доски
+  useEffect(() => {
+    if (game && game.isGameOver && game.gameState === GameStates.hasWinner && !winningLine) {
+      const winnerSymbol = game.getWinner().value;
+      const line = findWinningLine(game.field, winnerSymbol, winLength, size);
+      setWinningLine(line);
+    }
+  }, [board, game, winLength, size, winningLine]);
 
   const startNewGame = () => {
     const newS = pendingSize;
@@ -178,35 +255,54 @@ const TicTacToe: React.FC = () => {
       {/* Поле */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${size}, ${cellSize}px)`,
-          gap: 8,
-          justifyContent: "center",
+          position: "relative",
+          display: "inline-block",
           marginBottom: 24,
         }}
       >
-        {board.map((cell, i) => (
-          <div
-            key={i}
-            onClick={() => handleClick(i)}
-            style={{
-              width: cellSize,
-              height: cellSize,
-              border: "2px solid #333",
-              fontSize: Math.floor(cellSize * 0.7),
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: (vsBot && currentPlayer === playerO) || isOver ? "default" : "pointer",
-              background: "#fff",
-              userSelect: "none",
-              boxShadow: "0 3px 6px rgba(0,0,0,0.15)",
-              opacity: (vsBot && currentPlayer === playerO) ? 0.7 : 1,
-            }}
-          >
-            {getSymbol(cell)}
-          </div>
-        ))}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${size}, ${cellSize}px)`,
+            gap: 8,
+            justifyContent: "center",
+          }}
+        >
+          {board.map((cell, i) => (
+            <div
+              key={i}
+              onClick={() => handleClick(i)}
+              style={{
+                width: cellSize,
+                height: cellSize,
+                border: "2px solid #333",
+                fontSize: Math.floor(cellSize * 0.7),
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: (vsBot && currentPlayer === playerO) || isOver ? "default" : "pointer",
+                background: "#fff",
+                userSelect: "none",
+                boxShadow: "0 3px 6px rgba(0,0,0,0.15)",
+                opacity: (vsBot && currentPlayer === playerO) ? 0.7 : 1,
+              }}
+            >
+              {getSymbol(cell)}
+            </div>
+          ))}
+        </div>
+
+        {winningLine && (
+          <DrawWinLine
+            winningLine={winningLine}
+            size={size}
+            cellSize={cellSize}
+            gap={8}
+            strokeWidth={4}
+            stroke="red"
+            strokeLinecap="round"
+          />
+        )}
       </div>
 
       <h3 style={{ minHeight: 42 }}>{status}</h3>
