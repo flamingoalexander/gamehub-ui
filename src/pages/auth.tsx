@@ -7,16 +7,20 @@ import {
 	GlobalOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../@providers/auth";
-
+import { useStore } from "../store";
+import { Credentials } from "../api";
 const { Title, Text } = Typography;
 
 const AuthorizationForm = () => {
-	const { login } = useAuth();
+	const login = useStore((state) => state.login);
 	const navigate = useNavigate();
-	const onFinish = () => {
-		login();
-		navigate("/");
+	const onFinish = async (credentials: Credentials) => {
+		try {
+			await login(credentials);
+			navigate("/");
+		} catch {
+			alert("error");
+		}
 	};
 
 	return (
@@ -25,7 +29,11 @@ const AuthorizationForm = () => {
 				<Title level={2} style={{ textAlign: "center" }}>
 					Авторизация
 				</Title>
-				<Form name="authorization" onFinish={onFinish} layout="vertical">
+				<Form<Credentials>
+					name="authorization"
+					onFinish={onFinish}
+					layout="vertical"
+				>
 					<Form.Item
 						label="Электронная почта *"
 						name="email"

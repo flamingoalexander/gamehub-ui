@@ -6,11 +6,11 @@ import { Content } from "antd/es/layout/layout";
 import AppHeader from "../components/header";
 import Logo from "../components/logo";
 import Sider from "antd/es/layout/Sider";
-import { useAuth } from "../@providers/auth";
+import { useStore } from "../store";
 
 const MainPage: FC = () => {
 	const [collapsed, setCollapsed] = useState(false);
-	const { isAuthenticated } = useAuth();
+	const isAuthenticated = useStore((state) => state.isAuthenticated);
 	if (!isAuthenticated) {
 		return <Navigate to="/login" replace />;
 	}

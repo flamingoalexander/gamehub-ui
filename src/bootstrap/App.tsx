@@ -17,7 +17,6 @@ const App = () => {
 				<Route path="/tictactoe" element={<TicTacToe />} />
 				<Route path="/seabattle" element={<SeaBattle />} />
 				<Route path="/profile" element={<Profile />} />
-				<Route path="/login" element={<AuthorizationForm />} />
 				<Route path="/achievements" element={<AchievementsPage />} />
 				<Route path="/leaderboard" element={<Leaderboard />} />
 			</Route>

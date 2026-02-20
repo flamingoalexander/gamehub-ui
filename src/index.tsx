@@ -3,8 +3,8 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import App from "./bootstrap/App";
 import { ConfigProvider, ThemeConfig } from "antd";
-import { AuthProvider } from "./@providers/auth";
 import { BrowserRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 export const gameHubTheme: ThemeConfig = {
 	token: {
@@ -92,14 +92,17 @@ export const gameHubTheme: ThemeConfig = {
 const root = ReactDOM.createRoot(
 	document.getElementById("root") as HTMLElement,
 );
+
+const queryClient = new QueryClient();
+
 root.render(
 	<React.StrictMode>
 		<ConfigProvider theme={gameHubTheme}>
-			<AuthProvider>
-				<BrowserRouter>
+			<BrowserRouter>
+				<QueryClientProvider client={queryClient}>
 					<App />
-				</BrowserRouter>
-			</AuthProvider>
+				</QueryClientProvider>
+			</BrowserRouter>
 		</ConfigProvider>
 	</React.StrictMode>,
 );
