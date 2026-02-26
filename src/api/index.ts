@@ -21,6 +21,12 @@ export const login = async (credentials: Credentials) => {
 	tokenStorage.set(data.access);
 };
 
+export const register = async (credentials: Credentials) => {
+	console.log(credentials);
+	console.log(await $api.post<LoginResponse>("/register/", credentials));
+	alert("вы зарегестрировались");
+};
+
 export const logout = async () => {
 	await $api.post<LoginResponse>("/logout/");
 	tokenStorage.clear();

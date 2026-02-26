@@ -8,12 +8,12 @@ type UserState = {
 
 type UserStateActions = {
 	login: (credentials: Credentials) => Promise<void>;
-	logout: () => void;
+	logout: () => Promise<void>;
 };
 
 export const useStore = create<UserState & UserStateActions>((set) => ({
 	email: null,
-	isAuthenticated: false,
+	isAuthenticated: localStorage.getItem("accesstoken") ? true : false,
 	login: async (credentials) => {
 		await loginApi(credentials);
 		set({
@@ -24,6 +24,7 @@ export const useStore = create<UserState & UserStateActions>((set) => ({
 	logout: async () => {
 		await logoutApi();
 		set({
+			email: null,
 			isAuthenticated: false,
 		});
 	},

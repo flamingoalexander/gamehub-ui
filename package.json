@@ -56,5 +56,5 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.3.14"
 	},
-	"proxy": "http://91.132.58.57:8000/"
+	"proxy": "http://91.132.58.57/"
 }

@@ -2,7 +2,7 @@ import axios from "axios";
 import { refresh, tokenStorage } from "./index";
 
 const $api = axios.create({
-	baseURL: "",
+	baseURL: "api/",
 });
 
 $api.interceptors.request.use((config) => {

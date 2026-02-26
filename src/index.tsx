@@ -74,6 +74,7 @@ export const gameHubTheme: ThemeConfig = {
 
 		Input: {
 			borderRadius: 12,
+			colorTextPlaceholder: "rgba(255,255,255,.09)",
 			colorBgContainer: "rgba(255,255,255,.04)",
 			colorBorder: "rgba(148,163,184,.20)",
 			activeBorderColor: "rgba(56,189,248,.65)",

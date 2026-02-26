@@ -3,15 +3,20 @@ import SeaBattle from "../components/seaBattle";
 import Welcome from "../components/welcome";
 import TicTacToe from "../components/tictactoe";
 import Profile from "../components/profile";
-import AuthorizationForm from "../pages/auth";
+import AuthorizationForm from "../components/auth/authorizationForm";
 import MainPage from "../pages/main";
 import AchievementsPage from "../components/achievements";
 import Leaderboard from "../components/leaderboard";
+import AuthorizationWrapper from "../pages/auth";
+import RegistrationForm from "../components/auth/registrationForm";
 
 const App = () => {
 	return (
 		<Routes>
-			<Route path="/login" element={<AuthorizationForm />} />
+			<Route element={<AuthorizationWrapper />}>
+				<Route path="/login" element={<AuthorizationForm />} />
+				<Route path="/register" element={<RegistrationForm />} />
+			</Route>
 			<Route element={<MainPage />}>
 				<Route path="/" index element={<Welcome />} />
 				<Route path="/tictactoe" element={<TicTacToe />} />
