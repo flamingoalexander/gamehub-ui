@@ -1,5 +1,5 @@
-import React from "react";
-import { Form, Input, Button, Typography, Space } from "antd";
+import React, { useState } from "react";
+import { Form, Input, Button, Typography, Space, Alert } from "antd";
 import {
 	MailOutlined,
 	LockOutlined,
@@ -11,13 +11,28 @@ import { useAuth } from "../bootstrap/App";
 
 const { Title, Text } = Typography;
 
+interface FormValues {
+	email: string;
+	password: string;
+}
+
 const AuthorizationForm = () => {
-	const { login, isAuthenticated } = useAuth();
+	const { login } = useAuth();
 	const navigate = useNavigate();
-	const onFinish = () => {
-		login();
-		console.log(isAuthenticated);
-		navigate("/");
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	const onFinish = async (values: FormValues) => {
+		setLoading(true);
+		setError(null);
+		try {
+			await login(values.email, values.password);
+			navigate("/");
+		} catch (e: any) {
+			setError(e.message ?? "Ошибка авторизации");
+		} finally {
+			setLoading(false);
+		}
 	};
 
 	return (
@@ -33,11 +48,26 @@ const AuthorizationForm = () => {
 			<Title level={2} style={{ textAlign: "center" }}>
 				Авторизация
 			</Title>
+
+			{error && (
+				<Alert
+					message={error}
+					type="error"
+					showIcon
+					closable
+					onClose={() => setError(null)}
+					style={{ marginBottom: 16 }}
+				/>
+			)}
+
 			<Form name="authorization" onFinish={onFinish} layout="vertical">
 				<Form.Item
 					label="Электронная почта *"
 					name="email"
-					rules={[{ required: true, message: "Введите электронную почту" }]}
+					rules={[
+						{ required: true, message: "Введите электронную почту" },
+						{ type: "email", message: "Введите корректный email" },
+					]}
 				>
 					<Input
 						prefix={<MailOutlined />}
@@ -52,15 +82,16 @@ const AuthorizationForm = () => {
 					<Input.Password prefix={<LockOutlined />} placeholder="********" />
 				</Form.Item>
 				<Form.Item>
-					<Button type="primary" htmlType="submit" block>
+					<Button type="primary" htmlType="submit" block loading={loading}>
 						Авторизоваться
 					</Button>
 				</Form.Item>
 			</Form>
+
 			<Text style={{ display: "block", textAlign: "center", marginBottom: 16 }}>
 				Забыли пароль?
 			</Text>
-			<Space orientation="vertical" style={{ width: "100%" }}>
+			<Space direction="vertical" style={{ width: "100%" }}>
 				<Button
 					icon={<GoogleOutlined />}
 					block

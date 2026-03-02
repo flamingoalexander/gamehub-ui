@@ -24,26 +24,68 @@ import SideMenu from "../components/sideMenu";
 import Sider from "antd/es/layout/Sider";
 import Logo from "../components/logo";
 
+const BASE_URL = process.env.REACT_APP_API_URL ?? "http://localhost:8000";
+
+// ─── Типы ─────────────────────────────────────────────────────────────────────
+
 export type AuthContextType = {
 	isAuthenticated: boolean;
-	login: () => void;
+	login: (email: string, password: string) => Promise<void>;
 	logout: () => void;
 };
 export type FCC<T = unknown> = FC<PropsWithChildren<T>>;
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+
+export async function apiLogin(email: string, password: string): Promise<string> {
+	const res = await fetch(`${BASE_URL}/api/login/`, {
+		method: "POST",
+		credentials: "include",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ email, password }),
+	});
+	if (!res.ok) {
+		const body = await res.json().catch(() => ({}));
+		throw new Error(body?.detail ?? body?.error ?? "Неверный email или пароль");
+	}
+	const data = await res.json();
+	return data.access as string;
+}
+
+export async function apiLogout(): Promise<void> {
+	await fetch(`${BASE_URL}/api/logout/`, {
+		method: "POST",
+		credentials: "include",
+		headers: {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${localStorage.getItem("access_token") ?? ""}`,
+		},
+	}).catch(() => {});
+}
+
+// ─── Auth Context ─────────────────────────────────────────────────────────────
+
 const AuthContext = createContext<AuthContextType>({
 	isAuthenticated: false,
-	login: () => {},
+	login: async () => {},
 	logout: () => {},
 });
 
 export const AuthProvider: FCC = ({ children }) => {
-	const [isAuthenticated, setIsAuthenticated] = useState(false);
+	// Проверяем наличие токена при старте — восстанавливаем сессию
+	const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
+		() => !!localStorage.getItem("access_token")
+	);
 
-	const login = () => {
+	const login = async (email: string, password: string) => {
+		const token = await apiLogin(email, password);
+		localStorage.setItem("access_token", token);
 		setIsAuthenticated(true);
 	};
 
 	const logout = () => {
+		apiLogout();
+		localStorage.removeItem("access_token");
 		setIsAuthenticated(false);
 	};
 
@@ -55,6 +97,8 @@ export const AuthProvider: FCC = ({ children }) => {
 };
 
 export const useAuth: () => AuthContextType = () => useContext(AuthContext);
+
+// ─── Protected Layout ─────────────────────────────────────────────────────────
 
 const ProtectedLayout = () => {
 	const { isAuthenticated } = useAuth();
@@ -95,6 +139,8 @@ const ProtectedLayout = () => {
 		</Layout>
 	);
 };
+
+// ─── App ──────────────────────────────────────────────────────────────────────
 
 const App = () => {
 	return (
