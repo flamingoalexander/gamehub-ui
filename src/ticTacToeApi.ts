@@ -69,7 +69,7 @@ export interface WsLobbyState {
 export type WsMessage = WsFoundOpponent | WsGetTurn | WsGameEnded | WsLobbyState;
 
 function getToken(): string {
-  return localStorage.getItem("access_token") ?? "";
+  return localStorage.getItem("accesstoken") ?? "";
 }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {

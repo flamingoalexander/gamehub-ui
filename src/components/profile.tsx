@@ -1,6 +1,8 @@
 import { FC } from "react";
 import { Card, Avatar, Typography, Descriptions, Button, Space } from "antd";
 import { UserOutlined, MailOutlined } from "@ant-design/icons";
+import { useStore } from "../store";
+import { useMutation } from "@tanstack/react-query";
 
 const { Title, Text } = Typography;
 
@@ -14,6 +16,12 @@ const mockUser = {
 };
 
 const Profile: FC = () => {
+	const logout = useStore((state) => state.logout);
+
+	const logoutMutation = useMutation({
+		mutationFn: logout,
+	});
+
 	return (
 		<Card
 			style={{ maxWidth: 500, margin: "40px auto" }}
@@ -21,7 +29,14 @@ const Profile: FC = () => {
 				<Button type="primary" key="edit">
 					Редактировать
 				</Button>,
-				<Button key="logout">Выйти</Button>,
+				<Button
+					key="logout"
+					onClick={() => logoutMutation.mutate()}
+					loading={logoutMutation.isPending}
+					disabled={logoutMutation.isPending}
+				>
+					Выйти
+				</Button>,
 			]}
 		>
 			<Space orientation="vertical" align="center" style={{ width: "100%" }}>
@@ -36,11 +51,8 @@ const Profile: FC = () => {
 				<Descriptions.Item label="Email">
 					<MailOutlined /> {mockUser.email}
 				</Descriptions.Item>
-
 				<Descriptions.Item label="Роль">{mockUser.role}</Descriptions.Item>
-
 				<Descriptions.Item label="Уровень">{mockUser.level}</Descriptions.Item>
-
 				<Descriptions.Item label="О себе">{mockUser.bio}</Descriptions.Item>
 			</Descriptions>
 		</Card>

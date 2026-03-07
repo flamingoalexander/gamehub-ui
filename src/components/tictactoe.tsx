@@ -78,6 +78,7 @@ const TicTacToe: React.FC = () => {
   const [onlineError, setOnlineError] = useState<string | null>(null);
   const [lobbyId, setLobbyId] = useState<number | null>(null);
   const [isLobbyOwner, setIsLobbyOwner] = useState(false);
+  const [mySymbol, setMySymbol] = useState<"X"|"O">("X");
   const [onlineSize, setOnlineSize] = useState(3);
   const [onlineWinLen, setOnlineWinLen] = useState(3);
   const [onlineBoard, setOnlineBoard] = useState<OnlineBoard>(Array.from({length:3},()=>Array(3).fill(null)));
@@ -206,11 +207,14 @@ const TicTacToe: React.FC = () => {
   const handleWsMessage = useCallback((msg: WsMessage) => {
     switch (msg.type) {
       case "found_opponent": {
+        setMySymbol((msg as any).my_symbol ?? "X");
         setOpponent(msg.opponent);
         if (msg.map) setOnlineBoard(msg.map);
         setIsMyTurn(msg.is_your_turn);
         if (msg.board_size) { setOnlineSize(msg.board_size); onlineSizeRef.current = msg.board_size; }
         if (msg.win_length) { setOnlineWinLen(msg.win_length); onlineWinLenRef.current = msg.win_length; }
+        // Запускаем таймер сразу — владелец ходит первым
+        setTurnDeadline(Math.floor(Date.now() / 1000) + 120);
         setOnlinePhase("playing");
         socketRef.current?.disconnect();
         const sock = new TicTacToeSocket(lobbyIdRef.current!, "get_turn", handleWsMessage);
@@ -221,7 +225,12 @@ const TicTacToe: React.FC = () => {
       case "get_turn": {
         setOnlineBoard(msg.map);
         setIsMyTurn(msg.is_your_turn);
-        setTurnDeadline(null);
+        // Обновляем таймер для следующего игрока
+        if (!msg.game_over) {
+          setTurnDeadline(Math.floor(Date.now() / 1000) + 120);
+        } else {
+          setTurnDeadline(null);
+        }
         if (msg.game_over) {
           setOnlineWinnerId(msg.winner);
           if (msg.winner && msg.winner !== 0)
@@ -270,6 +279,7 @@ const TicTacToe: React.FC = () => {
     setLobbyId(data.lobby_id);
     lobbyIdRef.current = data.lobby_id;
     setIsLobbyOwner(data.is_owner === true);
+    setMySymbol((data as any).my_symbol ?? (data.is_owner ? "X" : "O"));
     setOnlineSize(actualSize);
     setOnlineWinLen(actualWinLen);
     onlineSizeRef.current = actualSize;
@@ -290,6 +300,9 @@ const TicTacToe: React.FC = () => {
     } else {
       setOpponent(data.opponent);
       setIsMyTurn(data.is_your_turn ?? false);
+      // Используем turn_started_at с бэка для точного дедлайна
+      const startedAt = (data as any).turn_started_at;
+      setTurnDeadline(startedAt ? startedAt + 120 : Math.floor(Date.now() / 1000) + 120);
       setOnlinePhase("playing");
     }
   }, [handleWsMessage, pendingOnlineSize, pendingOnlineWinLen]);
@@ -302,7 +315,7 @@ const TicTacToe: React.FC = () => {
     try {
       const res = await makeTurn(lobbyId, row, col);
       setOnlineBoard(res.map);
-      setTurnDeadline(res.timestamp + 120);
+      setTurnDeadline(res.game_over ? null : Math.floor(Date.now() / 1000) + 120);
       if (res.game_over) {
         setOnlineWinnerId(res.winner);
         if (res.winner && res.winner !== 0)
@@ -324,24 +337,26 @@ const TicTacToe: React.FC = () => {
     setLobbyId(null);
     lobbyIdRef.current = null;
     setOnlineBoard(Array.from({length:3},()=>Array(3).fill(null)));
-    setIsMyTurn(false); setOpponent(null); setOnlineWinningLine(null); setIsLobbyOwner(false);
+    setIsMyTurn(false); setOpponent(null); setOnlineWinningLine(null); setIsLobbyOwner(false); setMySymbol("X");
     setOnlineWinnerId(undefined); setOnlineError(null); setTurnDeadline(null);
     setMode("menu");
   }, []);
 
   const getOnlineCellSymbol = (cell: number | null) => {
     if (cell === null) return "";
-    return myUser && cell === myUser.id ? "X" : "O";
+    return myUser && cell === myUser.id ? mySymbol : (mySymbol === "X" ? "O" : "X");
   };
   const getOnlineCellColor = (cell: number | null) => {
-    if (cell === null) return "#fff";
-    return myUser && cell === myUser.id ? "#e8f4ff" : "#fff0f0";
+    if (cell === null) return "#ffffff";
+    return myUser && cell === myUser.id
+      ? (mySymbol === "X" ? "#dbeafe" : "#fce7f3")   // X — голубой, O — розовый
+      : (mySymbol === "X" ? "#fce7f3" : "#dbeafe");  // противник — наоборот
   };
   const onlineStatusText = (): string => {
     switch (onlinePhase) {
       case "searching": return "🔍 Подключаемся...";
       case "waiting":   return `⏳ Ожидаем соперника... (${onlineSize}×${onlineSize}, ${onlineWinLen} в ряд)`;
-      case "playing":   return isMyTurn ? "✅ Ваш ход" : timeLeft !== null ? `⏱ Ход соперника — ${timeLeft}с` : "⏳ Ход соперника...";
+      case "playing":   return isMyTurn ? `✅ Ваш ход${timeLeft !== null ? ` — ${timeLeft}с` : ""}` : timeLeft !== null ? `⏱ Ход соперника — ${timeLeft}с` : "⏳ Ход соперника...";
       case "finished":
         if (onlineWinnerId === 0) return "🤝 Ничья!";
         if (onlineWinnerId === undefined) return "";
@@ -352,11 +367,18 @@ const TicTacToe: React.FC = () => {
   const onlineCellSize = Math.max(50, Math.floor(480 / onlineSize));
 
   const PlayerCard: React.FC<{user: CurrentUserResponse | OpponentInfo | null; label: string; symbol: "X"|"O"; active: boolean}> = ({user, label, symbol, active}) => (
-    <div style={{...styles.playerCard, border: active ? "2px solid #1677ff" : "2px solid #ddd"}}>
+    <div style={{...styles.playerCard,
+      border: active
+        ? `2px solid ${symbol === "X" ? "#2563eb" : "#db2777"}`
+        : "2px solid #ddd",
+      background: active
+        ? (symbol === "X" ? "#eff6ff" : "#fdf2f8")
+        : "#fafafa",
+    }}>
       <div style={styles.avatar}>
         {user?.avatar
           ? <img src={user.avatar} alt="avatar" style={{width:48,height:48,borderRadius:"50%"}} />
-          : <span style={{fontSize:28}}>{symbol==="X"?"❌":"⭕"}</span>}
+          : <span style={{fontSize:28, color: symbol==="X" ? "#2563eb" : "#db2777"}}>{symbol==="X"?"✕":"○"}</span>}
       </div>
       <div style={{textAlign:"center"}}>
         <div style={{fontWeight:600}}>{label}</div>
@@ -507,9 +529,9 @@ const TicTacToe: React.FC = () => {
       )}
 
       <div style={styles.players}>
-        <PlayerCard user={myUser} label="Вы" symbol="X" active={isMyTurn && onlinePhase==="playing"} />
+        <PlayerCard user={myUser} label="Вы" symbol={mySymbol} active={isMyTurn && onlinePhase==="playing"} />
         <div style={{fontSize:24, alignSelf:"center"}}>VS</div>
-        <PlayerCard user={opponent} label="Соперник" symbol="O" active={!isMyTurn && onlinePhase==="playing"} />
+        <PlayerCard user={opponent} label="Соперник" symbol={mySymbol === "X" ? "O" : "X"} active={!isMyTurn && onlinePhase==="playing"} />
       </div>
 
       <p style={{...styles.status, color: onlinePhase==="finished"
@@ -526,10 +548,17 @@ const TicTacToe: React.FC = () => {
             const clickable = isMyTurn && onlinePhase==="playing" && cell===null && !isMakingMove;
             return (
               <div key={i} onClick={()=>handleOnlineClick(row, col)} style={{
-                width:onlineCellSize, height:onlineCellSize, border:"2px solid #333", borderRadius:6,
+                width:onlineCellSize, height:onlineCellSize,
+                border: clickable ? "2px solid #94a3b8" : "2px solid #e2e8f0",
+                borderRadius:6,
                 fontSize:Math.floor(onlineCellSize*0.55), display:"flex", alignItems:"center", justifyContent:"center",
                 cursor:clickable?"pointer":"default", background:getOnlineCellColor(cell),
                 userSelect:"none", boxShadow:"0 2px 4px rgba(0,0,0,0.1)", transition:"background 0.15s",
+                color: cell === null ? undefined
+                  : (myUser && cell === myUser.id
+                    ? (mySymbol === "X" ? "#2563eb" : "#db2777")
+                    : (mySymbol === "X" ? "#db2777" : "#2563eb")),
+                fontWeight: cell !== null ? 700 : undefined,
               }}>
                 {getOnlineCellSymbol(cell)}
               </div>
@@ -537,7 +566,11 @@ const TicTacToe: React.FC = () => {
           })}
         </div>
         {onlineWinningLine && (
-          <DrawWinLine winningLine={onlineWinningLine} size={onlineSize} cellSize={onlineCellSize} gap={6} strokeWidth={4} stroke="red" strokeLinecap="round" />
+          <DrawWinLine winningLine={onlineWinningLine} size={onlineSize} cellSize={onlineCellSize} gap={6} strokeWidth={5}
+            stroke={myUser && onlineWinnerId === myUser.id
+              ? (mySymbol === "X" ? "#2563eb" : "#db2777")
+              : (mySymbol === "X" ? "#db2777" : "#2563eb")}
+            strokeLinecap="round" />
         )}
       </div>
 

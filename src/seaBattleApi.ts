@@ -66,7 +66,7 @@ export type WsMessage = WsOpponentJoined | WsPlayerReady | WsShot | WsLobbyDelet
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 
-function getToken() { return localStorage.getItem("access_token") ?? ""; }
+function getToken() { return localStorage.getItem("accesstoken") ?? ""; }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
