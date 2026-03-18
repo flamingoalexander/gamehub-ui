@@ -1,13 +1,24 @@
 import React from "react";
-import { Form, Input, Button, Typography, Space, Card, Checkbox } from "antd";
+import {
+	Form,
+	Input,
+	Button,
+	Typography,
+	Space,
+	Card,
+	Checkbox,
+	message,
+} from "antd";
 import {
 	MailOutlined,
 	LockOutlined,
 	GoogleOutlined,
 	GlobalOutlined,
+	UserOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { register, Credentials } from "../../api";
+import { AxiosError } from "axios";
 
 const { Title, Text } = Typography;
 
@@ -15,24 +26,33 @@ type RegisterFormValues = Credentials & {
 	confirmPassword: string;
 	consentPersonalData: boolean;
 	consentRecommendations: boolean;
+	username: string;
 };
 
 const RegistrationForm = () => {
 	const navigate = useNavigate();
 
 	const onFinish = async (values: RegisterFormValues) => {
-		const { email, password } = values;
+		const { email, password, username } = values;
 
 		try {
-			await register({ email, password });
-			navigate("/"); // или navigate("/login") — как у тебя принято
-		} catch {
-			alert("error");
+			await register({ email, password, username });
+			message.success("Регистрация успешна");
+			navigate("/");
+		} catch (err) {
+			if (err instanceof AxiosError) {
+				const emailError = err.response?.data?.email;
+				if (emailError) {
+					message.error("Такая почта уже существует");
+					return;
+				}
+			}
+			message.error("Ошибка регистрации. Попробуйте позже.");
 		}
 	};
 
 	const onGoToAuth = () => {
-		navigate("/login"); // поменяй на "/auth" если у тебя другой роут
+		navigate("/login");
 	};
 
 	return (
@@ -60,13 +80,39 @@ const RegistrationForm = () => {
 						placeholder="Введите электронную почту"
 					/>
 				</Form.Item>
-
+				<Form.Item
+					label="Имя пользователя"
+					name="username"
+					rules={[
+						{ required: true, message: "Введите электронную имя пользователя" },
+						{ min: 3, message: "Минимум 3 символа" },
+						{ pattern: /^[A-Za-z0-9]+$/, message: "Только буквы и цифры" },
+					]}
+				>
+					<Input
+						prefix={<UserOutlined />}
+						placeholder="Введите имя пользователя"
+					/>
+				</Form.Item>
 				<Form.Item
 					label="Пароль *"
 					name="password"
 					rules={[
 						{ required: true, message: "Введите пароль" },
-						{ min: 6, message: "Пароль должен быть не менее 6 символов" },
+						{ min: 8, message: "Пароль должен быть не менее 8 символов" },
+						{
+							pattern: /[A-Z]/,
+							message:
+								"Пароль должен содержать хотя бы 1 заглавную букву (A-Z)",
+						},
+						{
+							pattern: /[a-z]/,
+							message: "Пароль должен содержать хотя бы 1 строчную букву (a-z)",
+						},
+						{
+							pattern: /\d/,
+							message: "Пароль должен содержать хотя бы 1 цифру (0-9)",
+						},
 					]}
 					hasFeedback
 				>
@@ -93,7 +139,10 @@ const RegistrationForm = () => {
 					<Input.Password prefix={<LockOutlined />} placeholder="********" />
 				</Form.Item>
 
-				<Space direction="vertical" style={{ width: "100%", marginBottom: 8 }}>
+				<Space
+					orientation="vertical"
+					style={{ width: "100%", marginBottom: 8 }}
+				>
 					<Form.Item
 						name="consentPersonalData"
 						valuePropName="checked"
