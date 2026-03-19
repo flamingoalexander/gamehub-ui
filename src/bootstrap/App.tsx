@@ -10,8 +10,13 @@ import AchievementsPage from "../components/achievements";
 import Leaderboard from "../components/leaderboard";
 import AuthorizationWrapper from "../pages/auth";
 import RegistrationForm from "../components/auth/registrationForm";
+import { useEffect } from "react";
+import { useStore } from "../store";
 
 const App = () => {
+	useEffect(() => {
+		useStore.getState()._init();
+	}, []);
 	return (
 		<Routes>
 			<Route element={<AuthorizationWrapper />}>
