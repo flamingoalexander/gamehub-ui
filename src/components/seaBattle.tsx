@@ -6,7 +6,7 @@ import SeaBattlePlayer from "./scripts/SeaBattle/SeaBattlePlayer";
 
 import {
   SEA_SIZE, SHIP_LENGTHS,
-  sbGameStart, sbPlaceShips, sbShoot, sbDeleteLobby, sbGetMe,
+  sbGameStart, sbPlaceShips, sbShoot, sbDeleteLobby, sbLeaveLobby, sbGetMe,
   SeaBattleSocket,
   type Field, type UserInfo, type WsMessage, type GameStartResponse,
 } from "../seaBattleApi";
@@ -23,13 +23,11 @@ function emptyField(): Field {
   return Array.from({ length: SEA_SIZE }, () => Array(SEA_SIZE).fill(null));
 }
 
-// Проверка можно ли поставить корабль
 function canPlace(field: Field, r: number, c: number, len: number, horiz: boolean): boolean {
   for (let i = 0; i < len; i++) {
     const pr = r + (horiz ? 0 : i);
     const pc = c + (horiz ? i : 0);
     if (pr >= SEA_SIZE || pc >= SEA_SIZE) return false;
-    // Проверить клетку и окружение
     for (let dr = -1; dr <= 1; dr++) {
       for (let dc = -1; dc <= 1; dc++) {
         const nr = pr + dr, nc = pc + dc;
@@ -73,45 +71,55 @@ function autoPlace(): Field {
 const Battleship: React.FC = () => {
   const [mode, setMode] = useState<Mode>("menu");
 
-  // ── Локальная игра (оригинальный код) ────────────────────────────────────
-  const playerGameRef    = useRef<SeaBattle | null>(null);
-  const computerGameRef  = useRef<SeaBattle | null>(null);
-  const [playerHits,      setPlayerHits]      = useState<boolean[][]>([]);
-  const [computerHits,    setComputerHits]    = useState<boolean[][]>([]);
-  const [playerHitsCount, setPlayerHitsCount] = useState(0);
+  // ── Локальная игра ────────────────────────────────────────────────────────
+  const playerGameRef       = useRef<SeaBattle | null>(null);
+  const computerGameRef     = useRef<SeaBattle | null>(null);
+  const [playerHits,        setPlayerHits]        = useState<boolean[][]>([]);
+  const [computerHits,      setComputerHits]      = useState<boolean[][]>([]);
+  const [playerHitsCount,   setPlayerHitsCount]   = useState(0);
   const [computerHitsCount, setComputerHitsCount] = useState(0);
-  const [playerShots,     setPlayerShots]     = useState(0);
-  const [computerShots,   setComputerShots]   = useState(0);
-  const [placingShips,    setPlacingShips]    = useState<number[]>([]);
-  const [isHorizontal,    setIsHorizontal]    = useState(true);
-  const [turn,            setTurn]            = useState<"player" | "computer">("player");
-  const [gameStarted,     setGameStarted]     = useState(false);
+  const [playerShots,       setPlayerShots]       = useState(0);
+  const [computerShots,     setComputerShots]     = useState(0);
+  const [placingShips,      setPlacingShips]      = useState<number[]>([]);
+  const [isHorizontal,      setIsHorizontal]      = useState(true);
+  const [turn,              setTurn]              = useState<"player" | "computer">("player");
+  const [gameStarted,       setGameStarted]       = useState(false);
 
   // ── Онлайн ───────────────────────────────────────────────────────────────
-  const [onlineError,   setOnlineError]   = useState<string | null>(null);
-  const [lobbyId,       setLobbyId]       = useState<number | null>(null);
-  const [isOwner,       setIsOwner]       = useState(false);
-  const [myUser,        setMyUser]        = useState<UserInfo | null>(null);
-  const [opponent,      setOpponent]      = useState<UserInfo | null>(null);
-  const [myReady,       setMyReady]       = useState(false);
-  const [enemyReady,    setEnemyReady]    = useState(false);
-  const [isMyTurn,      setIsMyTurn]      = useState(false);
-  const [winner,        setWinner]        = useState<number | null | undefined>(undefined);
-  const [isShooting,    setIsShooting]    = useState(false);
+  const [onlineError,  setOnlineError]  = useState<string | null>(null);
+  const [lobbyId,      setLobbyId]      = useState<number | null>(null);
+  const [isOwner,      setIsOwner]      = useState(false);
+  const [myUser,       setMyUser]       = useState<UserInfo | null>(null);
+  const [opponent,     setOpponent]     = useState<UserInfo | null>(null);
+  const [myReady,      setMyReady]      = useState(false);
+  const [enemyReady,   setEnemyReady]   = useState(false);
+  const [isMyTurn,     setIsMyTurn]     = useState(false);
+  const [winner,       setWinner]       = useState<number | null | undefined>(undefined);
+  const [isShooting,   setIsShooting]   = useState(false);
 
-  // Поля для онлайн-расстановки
-  const [placingField,  setPlacingField]  = useState<Field>(emptyField());
-  const [placingIdx,    setPlacingIdx]    = useState(0); // индекс текущего корабля
-  const [placingHoriz,  setPlacingHoriz]  = useState(true);
+  // ── Таймер хода ───────────────────────────────────────────────────────────
+  const [turnDeadline, setTurnDeadline] = useState<number | null>(null);
+  // timeLeft вычисляется синхронно при каждом рендере — нет задержки на первый тик
+  const [, forceUpdate] = useState(0);
 
-  // Поля для онлайн-игры
-  const [myShips,       setMyShips]       = useState<Field>(emptyField()); // моё поле
-  const [myShots,       setMyShots]       = useState<Field>(emptyField()); // выстрелы по мне
-  const [enemyView,     setEnemyView]     = useState<Field>(emptyField()); // мои выстрелы
+  const timeLeft = turnDeadline !== null
+    ? Math.max(0, turnDeadline - Math.floor(Date.now() / 1000))
+    : null;
+
+  // Поля расстановки
+  const [placingField, setPlacingField] = useState<Field>(emptyField());
+  const [placingIdx,   setPlacingIdx]   = useState(0);
+  const [placingHoriz, setPlacingHoriz] = useState(true);
+
+  // Поля игры
+  const [myShips,   setMyShips]   = useState<Field>(emptyField());
+  const [myShots,   setMyShots]   = useState<Field>(emptyField());
+  const [enemyView, setEnemyView] = useState<Field>(emptyField());
 
   const socketRef  = useRef<SeaBattleSocket | null>(null);
   const lobbyIdRef = useRef<number | null>(null);
 
+  // ── Инициализация ────────────────────────────────────────────────────────
   useEffect(() => {
     sbGetMe().then(setMyUser).catch(() => {});
     resetLocal();
@@ -126,8 +134,27 @@ const Battleship: React.FC = () => {
     return () => { socketRef.current?.disconnect(); };
   }, []);
 
+  // ── Таймер: перерисовываем компонент каждую секунду ─────────────────────
+  useEffect(() => {
+    if (turnDeadline === null) return;
+    const id = setInterval(() => forceUpdate(n => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [turnDeadline]);
+
+  // ── Завершение игры по таймеру (клиентская сторона) ─────────────────────
+  // Проигрывает тот, чей был ход. Удаляем лобби сразу.
+  useEffect(() => {
+    if (timeLeft !== 0) return;
+    if (mode !== "online_playing") return;
+    const w = isMyTurn ? (opponent?.id ?? null) : (myUser?.id ?? null);
+    setWinner(w);
+    setTurnDeadline(null);
+    // НЕ обнуляем lobbyIdRef — handleOnlineReset вызовет sbLeaveLobby
+    setMode("online_finished");
+  }, [timeLeft, mode]);
+
   // ═══════════════════════════════════════════════════════════════════════
-  // ЛОКАЛЬНАЯ ИГРА (оригинальный код)
+  // ЛОКАЛЬНАЯ ИГРА
   // ═══════════════════════════════════════════════════════════════════════
 
   const resetLocal = () => {
@@ -186,7 +213,7 @@ const Battleship: React.FC = () => {
           const ship = new Ship(length, player);
           (ship as any).hitCount = 0;
           player.ships.add(ship);
-          for (let i = 0; i < length; i++) game.placeShip(ship, r+(horiz?0:i), c+(horiz?i:0));
+          for (let i = 0; i < length; i++) game.placeShip(ship, r + (horiz ? 0 : i), c + (horiz ? i : 0));
           placed = true;
         }
       }
@@ -198,15 +225,15 @@ const Battleship: React.FC = () => {
     const len = placingShips[0];
     let ok = true;
     for (let i = 0; i < len; i++) {
-      const pr = r+(isHorizontal?0:i), pc = c+(isHorizontal?i:0);
-      if (pr>=SEA_SIZE || pc>=SEA_SIZE || playerGameRef.current?.field[pr]?.[pc]) { ok=false; break; }
+      const pr = r + (isHorizontal ? 0 : i), pc = c + (isHorizontal ? i : 0);
+      if (pr >= SEA_SIZE || pc >= SEA_SIZE || playerGameRef.current?.field[pr]?.[pc]) { ok = false; break; }
     }
     if (!ok) return;
     const ship = new Ship(len, playerGameRef.current?.players[1]!);
     (ship as any).hitCount = 0;
     playerGameRef.current?.players[1].ships.add(ship);
     for (let i = 0; i < len; i++)
-      playerGameRef.current?.placeShip(ship, r+(isHorizontal?0:i), c+(isHorizontal?i:0));
+      playerGameRef.current?.placeShip(ship, r + (isHorizontal ? 0 : i), c + (isHorizontal ? i : 0));
     setPlacingShips(prev => prev.slice(1));
     if (placingShips.length === 1) {
       playerGameRef.current?.startGame();
@@ -216,26 +243,26 @@ const Battleship: React.FC = () => {
   };
 
   const localOpponentBoardClick = (r: number, c: number) => {
-    if (placingShips.length>0 || !gameStarted || turn!=="player") return;
+    if (placingShips.length > 0 || !gameStarted || turn !== "player") return;
     if (playerHits[r][c]) return;
     const newHits = playerHits.map(row => row.slice());
     newHits[r][c] = true; setPlayerHits(newHits);
     const ship = computerGameRef.current?.field[r][c];
-    if (ship) { try { computerGameRef.current?.destroyShip(r,c); setPlayerHitsCount(h=>h+1); } catch {} }
-    setPlayerShots(s=>s+1);
+    if (ship) { try { computerGameRef.current?.destroyShip(r, c); setPlayerHitsCount(h => h + 1); } catch {} }
+    setPlayerShots(s => s + 1);
     if (computerGameRef.current?.gameState !== 2) setTurn("computer");
   };
 
   const computerShoot = () => {
     let shot = false;
     while (!shot) {
-      const r = Math.floor(Math.random()*SEA_SIZE), c = Math.floor(Math.random()*SEA_SIZE);
+      const r = Math.floor(Math.random() * SEA_SIZE), c = Math.floor(Math.random() * SEA_SIZE);
       if (!computerHits[r][c]) {
-        const newHits = computerHits.map(row=>row.slice());
+        const newHits = computerHits.map(row => row.slice());
         newHits[r][c] = true; setComputerHits(newHits);
         const ship = playerGameRef.current?.field[r][c];
-        if (ship) { try { playerGameRef.current?.destroyShip(r,c); setComputerHitsCount(h=>h+1); } catch {} }
-        setComputerShots(s=>s+1); shot = true;
+        if (ship) { try { playerGameRef.current?.destroyShip(r, c); setComputerHitsCount(h => h + 1); } catch {} }
+        setComputerShots(s => s + 1); shot = true;
       }
     }
     if (playerGameRef.current?.gameState !== 2) setTurn("player");
@@ -255,24 +282,27 @@ const Battleship: React.FC = () => {
         setOpponent(msg.opponent);
         setMode("online_placing");
         break;
+
       case "player_ready":
         if (msg.user_id !== myUser?.id) setEnemyReady(true);
         if (msg.both_ready) {
-          setIsMyTurn(msg.first_turn === myUser?.id);
+          const iMyTurn = msg.first_turn === myUser?.id;
+          setIsMyTurn(iMyTurn);
+          // Бэк не даёт timestamp при старте — берём текущее время
+          setTurnDeadline(Math.floor(Date.now() / 1000) + 120);
           setMode("online_playing");
         }
         break;
+
       case "shot": {
         const isShooterMe = msg.shooter_id === myUser?.id;
         if (isShooterMe) {
-          // Обновляем enemyView
           setEnemyView(prev => {
             const f = prev.map(r => [...r]) as Field;
             f[msg.row][msg.col] = msg.hit ? 2 : 0;
             return f;
           });
         } else {
-          // Противник стрелял по нам
           setMyShots(prev => {
             const f = prev.map(r => [...r]) as Field;
             f[msg.row][msg.col] = msg.hit ? 2 : 0;
@@ -280,16 +310,29 @@ const Battleship: React.FC = () => {
           });
         }
         setIsMyTurn(msg.is_your_turn);
+        // Запускаем таймер для того, чей наступил ход
+        setTurnDeadline(msg.timestamp + 120);
         if (msg.game_over) {
           setWinner(msg.winner);
+          setTurnDeadline(null);
           setMode("online_finished");
         }
         break;
       }
+
       case "lobby_deleted":
         setOnlineError("Владелец удалил лобби");
         handleOnlineReset();
         break;
+
+      case "game_ended": {
+        // Бек завершил игру по таймауту
+        setWinner((msg as any).winner ?? null);
+        setTurnDeadline(null);
+        // НЕ обнуляем lobbyIdRef — handleOnlineReset вызовет sbLeaveLobby
+        setMode("online_finished");
+        break;
+      }
     }
   }, [myUser?.id]);
 
@@ -323,12 +366,18 @@ const Battleship: React.FC = () => {
 
     if (data.status === "rejoined" && data.my_ready && data.enemy_ready) {
       setIsMyTurn(data.is_your_turn);
+      // Берём дедлайн с сервера — иначе сбрасываем в null (игра ещё не шла)
+      const deadline = (data as any).turn_deadline as number | null | undefined;
+      setTurnDeadline(deadline ?? null);
       setMode("online_playing");
     } else if (data.status === "rejoined" && data.my_ready) {
+      setTurnDeadline(null);
       setMode(data.opponent ? "online_placing" : "online_waiting");
     } else if (data.status === "joined") {
+      setTurnDeadline(null);
       setMode("online_placing");
     } else {
+      setTurnDeadline(null);
       setMode("online_waiting");
     }
   }, [handleWsMessage]);
@@ -336,15 +385,19 @@ const Battleship: React.FC = () => {
   const handleOnlineReset = useCallback(() => {
     socketRef.current?.disconnect();
     socketRef.current = null;
+    // Покидаем лобби — бэк удалит его когда оба игрока уйдут
+    if (lobbyIdRef.current) {
+      sbLeaveLobby(lobbyIdRef.current).catch(() => {});
+    }
     setLobbyId(null); lobbyIdRef.current = null;
     setOpponent(null); setMyReady(false); setEnemyReady(false);
     setIsMyTurn(false); setWinner(undefined); setOnlineError(null);
+    setTurnDeadline(null);
     setMyShips(emptyField()); setMyShots(emptyField()); setEnemyView(emptyField());
     setPlacingField(emptyField()); setPlacingIdx(0);
     setMode("menu");
   }, []);
 
-  // Клик по полю расстановки
   const handlePlacingClick = (r: number, c: number) => {
     if (placingIdx >= SHIP_LENGTHS.length) return;
     const len = SHIP_LENGTHS[placingIdx];
@@ -355,14 +408,15 @@ const Battleship: React.FC = () => {
   };
 
   const handleConfirmPlacement = async () => {
-    if (placingIdx < SHIP_LENGTHS.length) return;
-    if (!lobbyId) return;
+    if (placingIdx < SHIP_LENGTHS.length || !lobbyId) return;
     try {
       const res = await sbPlaceShips(lobbyId, placingField);
       setMyShips(placingField);
       setMyReady(true);
       if (res.both_ready) {
         setIsMyTurn(res.is_your_turn);
+        // Стартуем таймер от текущего момента — бэк не возвращает deadline здесь
+        setTurnDeadline(Math.floor(Date.now() / 1000) + 120);
         setMode("online_playing");
       }
     } catch (e: any) {
@@ -387,7 +441,11 @@ const Battleship: React.FC = () => {
         return f;
       });
       setIsMyTurn(res.is_your_turn);
-      if (res.game_over) { setWinner(res.winner); setMode("online_finished"); }
+      // Не сбрасываем таймер — WS shot обновит его когда придёт ответ
+      if (res.game_over) {
+        setWinner(res.winner);
+        setMode("online_finished");
+      }
     } catch (e: any) {
       setOnlineError(e.message);
     } finally {
@@ -395,23 +453,21 @@ const Battleship: React.FC = () => {
     }
   };
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // РЕНДЕР ПОЛЯ
-  // ═══════════════════════════════════════════════════════════════════════
-
-  const cellBg = (val: number | null | undefined, isShip?: boolean): string => {
-    if (val === 2) return "#52c41a";
-    if (val === 0) return "#ff4d4f";
-    if (isShip || val === 1) return "#a0d911";
-    return "#1890ff";
+  // ── Текст статуса с таймером ──────────────────────────────────────────────
+  const onlineStatusText = (): string => {
+    if (isMyTurn) {
+      return timeLeft !== null
+        ? `✅ Ваш ход — осталось ${timeLeft}с`
+        : "✅ Ваш ход — стреляйте по полю противника";
+    }
+    return timeLeft !== null
+      ? `⏱ Ход соперника — осталось ${timeLeft}с`
+      : "⏳ Ход соперника...";
   };
 
-  const cellEmoji = (val: number | null | undefined, isShip?: boolean): string => {
-    if (val === 2) return "💥";
-    if (val === 0) return "•";
-    if (isShip || val === 1) return "🚢";
-    return "";
-  };
+  // ═══════════════════════════════════════════════════════════════════════
+  // РЕНДЕР ПОЛЕЙ
+  // ═══════════════════════════════════════════════════════════════════════
 
   const renderOnlineField = (
     field: Field,
@@ -420,25 +476,26 @@ const Battleship: React.FC = () => {
     onClick?: (r: number, c: number) => void,
     showShips = true,
   ) => (
-    <div style={{ display:"grid", gridTemplateColumns:`repeat(${SEA_SIZE}, 40px)`, gap:4 }}>
-      {Array.from({length:SEA_SIZE}).map((_,r) =>
-        Array.from({length:SEA_SIZE}).map((_,c) => {
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${SEA_SIZE}, 40px)`, gap: 4 }}>
+      {Array.from({ length: SEA_SIZE }).map((_, r) =>
+        Array.from({ length: SEA_SIZE }).map((_, c) => {
           const shotVal = shots[r]?.[c];
           const shipVal = field[r]?.[c];
-          const bg = shotVal !== null && shotVal !== undefined
+          const hasShot = shotVal !== null && shotVal !== undefined;
+          const bg = hasShot
             ? (shotVal === 2 ? "#52c41a" : "#ff4d4f")
             : (showShips && shipVal === 1 ? "#a0d911" : "#1890ff");
-          const emoji = shotVal !== null && shotVal !== undefined
+          const emoji = hasShot
             ? (shotVal === 2 ? "💥" : "•")
             : (showShips && shipVal === 1 ? "🚢" : "");
           return (
             <div key={`${r}-${c}`}
               onClick={() => clickable && onClick?.(r, c)}
               style={{
-                width:40, height:40, border:"1px solid #333",
+                width: 40, height: 40, border: "1px solid #333",
                 cursor: clickable && shots[r]?.[c] === null ? "pointer" : "default",
-                display:"flex", alignItems:"center", justifyContent:"center",
-                background: bg, color:"#fff", fontWeight:"bold",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: bg, color: "#fff", fontWeight: "bold",
               }}
             >{emoji}</div>
           );
@@ -448,19 +505,19 @@ const Battleship: React.FC = () => {
   );
 
   const renderPlacingField = () => (
-    <div style={{ display:"grid", gridTemplateColumns:`repeat(${SEA_SIZE}, 40px)`, gap:4 }}>
-      {Array.from({length:SEA_SIZE}).map((_,r) =>
-        Array.from({length:SEA_SIZE}).map((_,c) => {
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${SEA_SIZE}, 40px)`, gap: 4 }}>
+      {Array.from({ length: SEA_SIZE }).map((_, r) =>
+        Array.from({ length: SEA_SIZE }).map((_, c) => {
           const val = placingField[r]?.[c];
           return (
             <div key={`${r}-${c}`}
               onClick={() => handlePlacingClick(r, c)}
               style={{
-                width:40, height:40, border:"1px solid #333",
+                width: 40, height: 40, border: "1px solid #333",
                 cursor: placingIdx < SHIP_LENGTHS.length ? "pointer" : "default",
-                display:"flex", alignItems:"center", justifyContent:"center",
+                display: "flex", alignItems: "center", justifyContent: "center",
                 background: val === 1 ? "#a0d911" : "#1890ff",
-                color:"#fff", fontWeight:"bold",
+                color: "#fff", fontWeight: "bold",
               }}
             >{val === 1 ? "🚢" : ""}</div>
           );
@@ -469,19 +526,19 @@ const Battleship: React.FC = () => {
     </div>
   );
 
-  // ─── Карточка игрока ─────────────────────────────────────────────────────
-  const PlayerCard: React.FC<{user: UserInfo|null; label: string; active: boolean; ready?: boolean}> = ({user, label, active, ready}) => (
-    <div style={{...styles.playerCard, border: active ? "2px solid #1677ff" : "2px solid #ddd"}}>
+  // ── Карточка игрока ───────────────────────────────────────────────────────
+  const PlayerCard: React.FC<{ user: UserInfo | null; label: string; active: boolean; ready?: boolean }> = ({ user, label, active, ready }) => (
+    <div style={{ ...styles.playerCard, border: active ? "2px solid #1677ff" : "2px solid #ddd" }}>
       <div style={styles.avatar}>
         {user?.avatar
-          ? <img src={user.avatar} alt="" style={{width:48,height:48,borderRadius:"50%"}} />
-          : <span style={{fontSize:28}}>👤</span>}
+          ? <img src={user.avatar} alt="" style={{ width: 48, height: 48, borderRadius: "50%" }} />
+          : <span style={{ fontSize: 28 }}>👤</span>}
       </div>
-      <div style={{textAlign:"center"}}>
-        <div style={{fontWeight:600}}>{label}</div>
-        <div style={{fontSize:12,color:"#888"}}>{user?.email ?? "ожидание..."}</div>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: 12, color: "#888" }}>{user?.email ?? "ожидание..."}</div>
         {ready !== undefined && (
-          <div style={{fontSize:12, color: ready ? "#22a06b" : "#888", marginTop:4}}>
+          <div style={{ fontSize: 12, color: ready ? "#22a06b" : "#888", marginTop: 4 }}>
             {ready ? "✅ Готов" : "⏳ Расставляет..."}
           </div>
         )}
@@ -501,10 +558,10 @@ const Battleship: React.FC = () => {
         {onlineError && (
           <div style={styles.errorBox}>
             ⚠️ {onlineError}
-            <button onClick={()=>setOnlineError(null)} style={styles.closeBtn}>×</button>
+            <button onClick={() => setOnlineError(null)} style={styles.closeBtn}>×</button>
           </div>
         )}
-        <div style={{display:"flex", gap:16, marginTop:16}}>
+        <div style={{ display: "flex", gap: 16, marginTop: 16 }}>
           <Button type="primary" size="large" onClick={() => { resetLocal(); setMode("local"); }}>
             🎮 Локальная игра
           </Button>
@@ -521,10 +578,10 @@ const Battleship: React.FC = () => {
     return (
       <div style={styles.container}>
         <h2>🚢 Морской бой — Онлайн</h2>
-        <p style={{color:"#888"}}>⏳ Ожидаем соперника...</p>
+        <p style={{ color: "#888" }}>⏳ Ожидаем соперника...</p>
         <div style={styles.players}>
           <PlayerCard user={myUser} label="Вы" active={false} />
-          <div style={{fontSize:24, alignSelf:"center"}}>VS</div>
+          <div style={{ fontSize: 24, alignSelf: "center" }}>VS</div>
           <PlayerCard user={null} label="Соперник" active={false} />
         </div>
         {isOwner && (
@@ -535,39 +592,38 @@ const Battleship: React.FC = () => {
             🗑 Удалить лобби
           </Button>
         )}
-        <Button onClick={handleOnlineReset} style={{marginTop:8}}>← В меню</Button>
+        <Button onClick={handleOnlineReset} style={{ marginTop: 8 }}>← В меню</Button>
       </div>
     );
   }
 
   // ── Расстановка кораблей ──────────────────────────────────────────────────
   if (mode === "online_placing") {
-    const remaining = SHIP_LENGTHS.slice(placingIdx);
     return (
       <div style={styles.container}>
         <h2>🚢 Морской бой — Расстановка</h2>
         <div style={styles.players}>
           <PlayerCard user={myUser} label="Вы" active={false} ready={myReady} />
-          <div style={{fontSize:24, alignSelf:"center"}}>VS</div>
+          <div style={{ fontSize: 24, alignSelf: "center" }}>VS</div>
           <PlayerCard user={opponent} label="Соперник" active={false} ready={enemyReady} />
         </div>
 
         {!myReady ? (
           <>
-            <p style={{margin:0}}>
+            <p style={{ margin: 0 }}>
               {placingIdx < SHIP_LENGTHS.length
                 ? `Разместите корабль длины ${SHIP_LENGTHS[placingIdx]} (осталось: ${SHIP_LENGTHS.slice(placingIdx).join(", ")})`
                 : "Все корабли расставлены! Нажмите «Готов»"}
             </p>
-            <div style={{display:"flex", gap:8, flexWrap:"wrap", justifyContent:"center"}}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
               {placingIdx < SHIP_LENGTHS.length && (
-                <Button onClick={()=>setPlacingHoriz(h=>!h)}>
+                <Button onClick={() => setPlacingHoriz(h => !h)}>
                   {placingHoriz ? "↕ Вертикально" : "↔ Горизонтально"}
                 </Button>
               )}
               <Button onClick={handleAutoPlace}>🎲 Авто</Button>
               {placingIdx > 0 && (
-                <Button onClick={()=>{ setPlacingField(emptyField()); setPlacingIdx(0); }}>
+                <Button onClick={() => { setPlacingField(emptyField()); setPlacingIdx(0); }}>
                   🔄 Сбросить
                 </Button>
               )}
@@ -580,7 +636,7 @@ const Battleship: React.FC = () => {
             )}
           </>
         ) : (
-          <p style={{color:"#22a06b", fontWeight:600}}>
+          <p style={{ color: "#22a06b", fontWeight: 600 }}>
             ✅ Вы готовы! Ждём соперника...
           </p>
         )}
@@ -590,10 +646,11 @@ const Battleship: React.FC = () => {
     );
   }
 
-  // ── Игра ─────────────────────────────────────────────────────────────────
+  // ── Игра / финиш ─────────────────────────────────────────────────────────
   if (mode === "online_playing" || mode === "online_finished") {
     const finished = mode === "online_finished";
     const iWon = winner === myUser?.id;
+
     return (
       <div style={styles.container}>
         <h2>🚢 Морской бой — Онлайн</h2>
@@ -601,38 +658,44 @@ const Battleship: React.FC = () => {
         {onlineError && (
           <div style={styles.errorBox}>
             ⚠️ {onlineError}
-            <button onClick={()=>setOnlineError(null)} style={styles.closeBtn}>×</button>
+            <button onClick={() => setOnlineError(null)} style={styles.closeBtn}>×</button>
           </div>
         )}
 
         <div style={styles.players}>
-          <PlayerCard user={myUser} label="Вы" active={isMyTurn && !finished} />
-          <div style={{fontSize:24, alignSelf:"center"}}>VS</div>
-          <PlayerCard user={opponent} label="Соперник" active={!isMyTurn && !finished} />
+          <PlayerCard user={myUser}    label="Вы"       active={isMyTurn  && !finished} />
+          <div style={{ fontSize: 24, alignSelf: "center" }}>VS</div>
+          <PlayerCard user={opponent}  label="Соперник" active={!isMyTurn && !finished} />
         </div>
 
+        {/* Статус с таймером */}
         {finished ? (
-          <p style={{...styles.status, color: iWon ? "#22a06b" : "#e34935"}}>
+          <p style={{ ...styles.status, color: winner === 0 ? "#888" : iWon ? "#22a06b" : "#e34935" }}>
             {winner === 0 ? "🤝 Ничья!" : iWon ? "🎉 Вы победили!" : "😔 Вы проиграли"}
           </p>
         ) : (
-          <p style={styles.status}>
-            {isMyTurn ? "✅ Ваш ход — стреляйте по полю противника" : "⏳ Ход соперника..."}
+          <p style={{
+            ...styles.status,
+            color: isMyTurn
+              ? (timeLeft !== null && timeLeft <= 10 ? "#e34935" : "#22a06b")
+              : "#888",
+          }}>
+            {onlineStatusText()}
           </p>
         )}
 
-        <div style={{display:"flex", gap:32, flexWrap:"wrap", justifyContent:"center"}}>
+        <div style={{ display: "flex", gap: 32, flexWrap: "wrap", justifyContent: "center" }}>
           <div>
-            <h3 style={{textAlign:"center"}}>Ваше поле</h3>
+            <h3 style={{ textAlign: "center" }}>Ваше поле</h3>
             {renderOnlineField(myShips, myShots, false, undefined, true)}
           </div>
           <div>
-            <h3 style={{textAlign:"center"}}>Поле противника</h3>
+            <h3 style={{ textAlign: "center" }}>Поле противника</h3>
             {renderOnlineField(emptyField(), enemyView, isMyTurn && !finished, handleOnlineShoot, false)}
           </div>
         </div>
 
-        <Button onClick={handleOnlineReset} danger={!finished} style={{marginTop:16}}>
+        <Button onClick={handleOnlineReset} danger={!finished} style={{ marginTop: 16 }}>
           {finished ? "Играть снова" : "Выйти из игры"}
         </Button>
       </div>
@@ -650,21 +713,21 @@ const Battleship: React.FC = () => {
         </Button>
       )}
 
-      <div style={{ display:"flex", justifyContent:"center", gap:32 }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 32 }}>
         <div>
           <h3>Ваше поле</h3>
-          <div style={{ display:"grid", gridTemplateColumns:`repeat(${SEA_SIZE}, 40px)`, gap:4, marginBottom:16 }}>
-            {Array.from({length:SEA_SIZE}).map((_,r) =>
-              Array.from({length:SEA_SIZE}).map((_,c) => (
-                <div key={`${r}-${c}-p`} onClick={()=>localPlayerBoardClick(r,c)}
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${SEA_SIZE}, 40px)`, gap: 4, marginBottom: 16 }}>
+            {Array.from({ length: SEA_SIZE }).map((_, r) =>
+              Array.from({ length: SEA_SIZE }).map((_, c) => (
+                <div key={`${r}-${c}-p`} onClick={() => localPlayerBoardClick(r, c)}
                   style={{
-                    width:40, height:40, border:"1px solid #333",
-                    cursor: localPlacing?"pointer":"default",
-                    display:"flex", alignItems:"center", justifyContent:"center",
+                    width: 40, height: 40, border: "1px solid #333",
+                    cursor: localPlacing ? "pointer" : "default",
+                    display: "flex", alignItems: "center", justifyContent: "center",
                     background: computerHits[r]?.[c]
                       ? (playerGameRef.current?.field[r]?.[c] ? "#52c41a" : "#ff4d4f")
                       : (playerGameRef.current?.field[r]?.[c] ? "#a0d911" : "#1890ff"),
-                    color:"#fff", fontWeight:"bold",
+                    color: "#fff", fontWeight: "bold",
                   }}>
                   {computerHits[r]?.[c] ? (playerGameRef.current?.field[r]?.[c] ? "💥" : "•") : (playerGameRef.current?.field[r]?.[c] ? "🚢" : "")}
                 </div>
@@ -674,18 +737,18 @@ const Battleship: React.FC = () => {
         </div>
         <div>
           <h3>Поле противника</h3>
-          <div style={{ display:"grid", gridTemplateColumns:`repeat(${SEA_SIZE}, 40px)`, gap:4, marginBottom:16 }}>
-            {Array.from({length:SEA_SIZE}).map((_,r) =>
-              Array.from({length:SEA_SIZE}).map((_,c) => (
-                <div key={`${r}-${c}-o`} onClick={()=>localOpponentBoardClick(r,c)}
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${SEA_SIZE}, 40px)`, gap: 4, marginBottom: 16 }}>
+            {Array.from({ length: SEA_SIZE }).map((_, r) =>
+              Array.from({ length: SEA_SIZE }).map((_, c) => (
+                <div key={`${r}-${c}-o`} onClick={() => localOpponentBoardClick(r, c)}
                   style={{
-                    width:40, height:40, border:"1px solid #333",
-                    cursor: !localPlacing&&gameStarted&&turn==="player"?"pointer":"default",
-                    display:"flex", alignItems:"center", justifyContent:"center",
+                    width: 40, height: 40, border: "1px solid #333",
+                    cursor: !localPlacing && gameStarted && turn === "player" ? "pointer" : "default",
+                    display: "flex", alignItems: "center", justifyContent: "center",
                     background: playerHits[r]?.[c]
                       ? (computerGameRef.current?.field[r]?.[c] ? "#52c41a" : "#ff4d4f")
                       : "#1890ff",
-                    color:"#fff", fontWeight:"bold",
+                    color: "#fff", fontWeight: "bold",
                   }}>
                   {playerHits[r]?.[c] ? (computerGameRef.current?.field[r]?.[c] ? "💥" : "•") : ""}
                 </div>
@@ -703,25 +766,25 @@ const Battleship: React.FC = () => {
           <h3>Выстрелы противника: {computerShots}</h3>
         </>
       )}
-      {playerWin  && <h2 style={{color:"green"}}>Победа! 🎉</h2>}
-      {computerWin && <h2 style={{color:"red"}}>Поражение! 😞</h2>}
+      {playerWin   && <h2 style={{ color: "green" }}>Победа! 🎉</h2>}
+      {computerWin && <h2 style={{ color: "red" }}>Поражение! 😞</h2>}
 
-      <div style={{display:"flex", gap:8, justifyContent:"center"}}>
+      <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
         <Button onClick={resetLocal}>Новая игра</Button>
-        <Button onClick={()=>setMode("menu")}>← В меню</Button>
+        <Button onClick={() => setMode("menu")}>← В меню</Button>
       </div>
     </div>
   );
 };
 
 const styles: Record<string, React.CSSProperties> = {
-  container: { textAlign:"center", fontFamily:"sans-serif", padding:24, display:"flex", flexDirection:"column", alignItems:"center", gap:16 },
-  players:   { display:"flex", gap:32, justifyContent:"center", alignItems:"stretch", marginBottom:8 },
-  playerCard:{ borderRadius:12, padding:"12px 24px", display:"flex", flexDirection:"column", alignItems:"center", gap:8, minWidth:140, background:"#fafafa", transition:"border 0.2s" },
-  avatar:    { width:52, height:52, borderRadius:"50%", background:"#f0f0f0", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden" },
-  status:    { fontSize:18, fontWeight:600, margin:0, minHeight:28 },
-  errorBox:  { background:"#fff2f0", border:"1px solid #ffccc7", borderRadius:8, padding:"8px 16px", color:"#cf1322", display:"flex", alignItems:"center", gap:12 },
-  closeBtn:  { background:"none", border:"none", cursor:"pointer", fontSize:18, color:"#cf1322", padding:0 },
+  container:  { textAlign: "center", fontFamily: "sans-serif", padding: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 },
+  players:    { display: "flex", gap: 32, justifyContent: "center", alignItems: "stretch", marginBottom: 8 },
+  playerCard: { borderRadius: 12, padding: "12px 24px", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, minWidth: 140, background: "#fafafa", transition: "border 0.2s" },
+  avatar:     { width: 52, height: 52, borderRadius: "50%", background: "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  status:     { fontSize: 18, fontWeight: 600, margin: 0, minHeight: 28, transition: "color 0.3s" },
+  errorBox:   { background: "#fff2f0", border: "1px solid #ffccc7", borderRadius: 8, padding: "8px 16px", color: "#cf1322", display: "flex", alignItems: "center", gap: 12 },
+  closeBtn:   { background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#cf1322", padding: 0 },
 };
 
 export default Battleship;

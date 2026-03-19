@@ -6,7 +6,7 @@ export const SHIP_LENGTHS = [4, 3, 2, 2, 1];
 
 // ─── Типы ─────────────────────────────────────────────────────────────────────
 
-export type Cell = null | 0 | 1 | 2; // null=пусто, 0=промах, 1=корабль, 2=попадание
+export type Cell = null | 0 | 1 | 2;
 export type Field = Cell[][];
 
 export interface UserInfo {
@@ -18,9 +18,9 @@ export interface UserInfo {
 export interface LobbyState {
   lobby_id: number;
   is_owner: boolean;
-  my_ships: Field;       // моё поле с кораблями
-  my_shots: Field;       // выстрелы противника по моему полю
-  enemy_view: Field;     // моё поле выстрелов по противнику
+  my_ships: Field;
+  my_shots: Field;
+  enemy_view: Field;
   my_ready: boolean;
   enemy_ready: boolean;
   is_your_turn: boolean;
@@ -30,6 +30,7 @@ export interface LobbyState {
 
 export interface GameStartResponse extends LobbyState {
   status: "created" | "joined" | "rejoined";
+  turn_deadline: number | null; // unix timestamp (секунды) — дедлайн текущего хода
 }
 
 export interface PlaceShipsResponse {
@@ -62,7 +63,8 @@ export type WsShot = {
   timestamp: number;
 };
 export type WsLobbyDeleted = { type: "lobby_deleted" };
-export type WsMessage = WsOpponentJoined | WsPlayerReady | WsShot | WsLobbyDeleted;
+export type WsGameEnded    = { type: "game_ended"; winner: number | null; reason?: string };
+export type WsMessage = WsOpponentJoined | WsPlayerReady | WsShot | WsLobbyDeleted | WsGameEnded;
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 
@@ -85,7 +87,7 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   return res.json() as Promise<T>;
 }
 
-export const sbGameStart  = () =>
+export const sbGameStart = () =>
   apiFetch<GameStartResponse>("/seabattle/game_start/", { method: "POST" });
 
 export const sbPlaceShips = (lobbyId: number, ships: Field) =>
@@ -106,8 +108,31 @@ export const sbDeleteLobby = (lobbyId: number) =>
     body: JSON.stringify({ lobby_id: lobbyId }),
   });
 
+/**
+ * POST /seabattle/leave_lobby/
+ * Покинуть лобби. Доступно любому участнику.
+ * Бэкенд удаляет лобби когда оба игрока покинули его.
+ */
+export const sbLeaveLobby = (lobbyId: number) =>
+  apiFetch<{ status: string }>("/seabattle/leave_lobby/", {
+    method: "POST",
+    body: JSON.stringify({ lobby_id: lobbyId }),
+  });
+
 export const sbGetMe = () =>
   apiFetch<UserInfo>("/seabattle/me/");
+
+/**
+ * POST /seabattle/forfeit/
+ * Вызывается когда таймер истёк на клиенте.
+ * Сервер проверяет дедлайн, удаляет лобби и рассылает game_ended обоим игрокам.
+ * Если лобби уже удалено — возвращает { status: "already_deleted" }, это не ошибка.
+ */
+export const sbForfeit = (lobbyId: number) =>
+  apiFetch<{ status: string }>("/seabattle/forfeit/", {
+    method: "POST",
+    body: JSON.stringify({ lobby_id: lobbyId }),
+  });
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
 

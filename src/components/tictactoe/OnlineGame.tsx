@@ -82,11 +82,20 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
   const [winningLine, setWinningLine]   = useState<Point[] | null>(null);
   const [isMakingMove, setIsMakingMove] = useState(false);
   const [turnDeadline, setTurnDeadline] = useState<number | null>(null);
-  const [timeLeft, setTimeLeft]         = useState<number | null>(null);
   const [localError, setLocalError]     = useState<string | null>(null);
+  // "X" = создатель лобби (ходит первым), "O" = присоединившийся
+  const [mySymbol, setMySymbol]         = useState<"X" | "O">("X");
+  // timeLeft вычисляется синхронно при каждом рендере — нет задержки на первый тик
+  const [, forceUpdate] = useState(0);
 
-  const socketRef  = useRef<TicTacToeSocket | null>(null);
-  const lobbyIdRef = useRef<number | null>(null);
+  const timeLeft = turnDeadline !== null
+    ? Math.max(0, turnDeadline - Math.floor(Date.now() / 1000))
+    : null;
+
+  const socketRef   = useRef<TicTacToeSocket | null>(null);
+  const lobbyIdRef  = useRef<number | null>(null);
+  // Защита от двойного вызова в React StrictMode
+  const startedRef  = useRef(false);
 
   // ── Загрузка данных текущего пользователя ────────────────────────────────
   useEffect(() => {
@@ -98,14 +107,23 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
     return () => { socketRef.current?.disconnect(); };
   }, []);
 
-  // ── Таймер хода (timestamp из make_turn) ─────────────────────────────────
+  // ── Таймер: перерисовываем компонент каждую секунду ─────────────────────
   useEffect(() => {
-    if (turnDeadline === null) { setTimeLeft(null); return; }
-    const tick = () => setTimeLeft(Math.max(0, turnDeadline - Math.floor(Date.now() / 1000)));
-    tick();
-    const id = setInterval(tick, 1000);
+    if (turnDeadline === null) return;
+    const id = setInterval(() => forceUpdate(n => n + 1), 1000);
     return () => clearInterval(id);
   }, [turnDeadline]);
+
+  // ── Завершение игры по таймеру ────────────────────────────────────────────
+  useEffect(() => {
+    if (timeLeft !== 0) return;
+    if (phase !== "playing") return;
+    // Проигрывает тот, чей был ход (не успел сделать ход вовремя)
+    const w = isMyTurn ? (opponent?.id ?? null) : (myUser?.id ?? null);
+    setWinnerId(w);
+    setTurnDeadline(null);
+    setPhase("finished");
+  }, [timeLeft, phase]);
 
   // ── Обработчик WS-сообщений ──────────────────────────────────────────────
 
@@ -133,7 +151,8 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
       case "get_turn": {
         setBoard(msg.map);
         setIsMyTurn(msg.is_your_turn);
-        setTurnDeadline(null);
+        // Запускаем таймер для того, чей сейчас ход (timestamp + 120 сек)
+        setTurnDeadline(msg.timestamp + 120);
         if (msg.game_over) {
           setWinnerId(msg.winner);
           if (msg.winner && msg.winner !== 0)
@@ -153,6 +172,10 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
       case "lobby_state": {
         setBoard(msg.map);
         setIsMyTurn(msg.is_your_turn);
+        // Восстанавливаем таймер из WS-сообщения — приходит сразу после подключения при rejoin
+        const deadline = (msg as any).turn_deadline as number | null | undefined;
+        if (deadline) setTurnDeadline(deadline);
+        setPhase("playing");
         break;
       }
     }
@@ -160,26 +183,50 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
 
   // ── Шаг 1–4: запуск онлайн-игры ──────────────────────────────────────────
   useEffect(() => {
-    let cancelled = false;
+    // Защита от двойного вызова в React StrictMode:
+    // без этого StrictMode делает два HTTP-запроса gameStart подряд,
+    // и второй попадает в rejoin вместо нормального создания/поиска лобби.
+    if (startedRef.current) return;
+    startedRef.current = true;
+
     (async () => {
       let data: GameStartResponse;
       try {
         data = await gameStart(3, 3);
       } catch (e: any) {
-        if (!cancelled) {
-          onError(e.message ?? "Ошибка подключения к серверу");
-          onExit();
-        }
+        onError(e.message ?? "Ошибка подключения к серверу");
+        onExit();
         return;
       }
-      if (cancelled) return;
 
       setLobbyId(data.lobby_id);
       lobbyIdRef.current = data.lobby_id;
       setBoard(data.map);
 
-      // Шаг 3: rejoin
+      // Шаг 3: rejoin — определяем символ по чётности заполненных ячеек
       if (data.status === "rejoined") {
+        if (data.opponent) setOpponent(data.opponent);
+        if (data.is_your_turn !== null) setIsMyTurn(data.is_your_turn);
+        // Используем дедлайн с сервера — не сбрасываем таймер при перезаходе
+        const deadline = (data as any).turn_deadline as number | undefined;
+        if (deadline) setTurnDeadline(deadline);
+        const filledCells = data.map.flat().filter(c => c !== null).length;
+        const iAmX = filledCells % 2 === 0
+          ? data.is_your_turn === true
+          : data.is_your_turn === false;
+        setMySymbol(iAmX ? "X" : "O");
+        const sock = new TicTacToeSocket(data.lobby_id, "get_turn", handleWsMessage);
+        sock.connect();
+        socketRef.current = sock;
+        setPhase("playing");
+        return;
+      }
+
+      // Шаг 4: joined — я присоединился к чужому лобби → я O (хожу вторым)
+      // Бэк уже уведомил первого игрока через found_opponent.
+      // Нам не нужно ждать found_opponent — сразу переходим в игру.
+      if (data.status === "joined") {
+        setMySymbol("O");
         if (data.opponent) setOpponent(data.opponent);
         if (data.is_your_turn !== null) setIsMyTurn(data.is_your_turn);
         const sock = new TicTacToeSocket(data.lobby_id, "get_turn", handleWsMessage);
@@ -189,25 +236,15 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
         return;
       }
 
-      // Шаг 4: joined — найдено открытое лобби
-      if (data.status === "joined") {
-        setPhase("joining");
-        if (data.opponent) setOpponent(data.opponent);
-        if (data.is_your_turn !== null) setIsMyTurn(data.is_your_turn);
-        const sock = new TicTacToeSocket(data.lobby_id, "found_opponent", handleWsMessage);
-        sock.connect();
-        socketRef.current = sock;
-        return;
-      }
-
-      // Шаг 4: created — ждём соперника
+      // Шаг 4: created — я создал лобби → я X (хожу первым)
+      setMySymbol("X");
       setPhase("waiting");
       const sock = new TicTacToeSocket(data.lobby_id, "found_opponent", handleWsMessage);
       sock.connect();
       socketRef.current = sock;
     })();
 
-    return () => { cancelled = true; };
+    return () => { socketRef.current?.disconnect(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -220,7 +257,9 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
     try {
       const res = await makeTurn(lobbyId, row, col);
       setBoard(res.map);
-      setTurnDeadline(res.timestamp + 120);
+      // Сбрасываем таймер — новый придёт через WS get_turn сопернику,
+      // а нам бэк пришлёт get_turn когда соперник походит
+      setTurnDeadline(null);
 
       // Шаг 7: проверка завершения
       if (res.game_over) {
@@ -245,15 +284,19 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
     onExit();
   }, [onExit]);
 
-  // ── Вспомогательные функции ───────────────────────────────────────────────
-  const getCellSymbol = (cell: number | null) => {
+  // Символ в ячейке определяется по роли, а не по id:
+  // X = создатель лобби (mySymbol="X" → ячейки с myUser.id),
+  // O = присоединившийся (mySymbol="O" → ячейки с myUser.id)
+  const getCellSymbol = (cell: number | null): string => {
     if (cell === null) return "";
-    return myUser && cell === myUser.id ? "X" : "O";
+    if (!myUser) return cell !== null ? "?" : "";
+    return cell === myUser.id ? mySymbol : (mySymbol === "X" ? "O" : "X");
   };
 
-  const getCellColor = (cell: number | null) => {
-    if (cell === null) return "#fff";
-    return myUser && cell === myUser.id ? "#e8f4ff" : "#fff0f0";
+  const getCellColor = (cell: number | null): string => {
+    if (cell === null) return "#1e2a3a";
+    if (!myUser) return "#1e2a3a";
+    return cell === myUser.id ? "#1a3a5c" : "#3a1a1a";
   };
 
   const statusText = (): string => {
@@ -263,8 +306,14 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
       case "joining":    return "🔗 Присоединяемся к игре...";
       case "rejoining":  return "🔄 Восстанавливаем игру...";
       case "playing":
-        if (isMyTurn) return "✅ Ваш ход";
-        return timeLeft !== null ? `⏱ Ход соперника — осталось ${timeLeft}с` : "⏳ Ход соперника...";
+        if (isMyTurn) {
+          return timeLeft !== null
+            ? `✅ Ваш ход — осталось ${timeLeft}с`
+            : "✅ Ваш ход";
+        }
+        return timeLeft !== null
+          ? `⏱ Ход соперника — осталось ${timeLeft}с`
+          : "⏳ Ход соперника...";
       case "finished":
         if (winnerId === 0 || winnerId === null) return "🤝 Ничья!";
         if (winnerId === undefined) return "";
@@ -293,9 +342,9 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
 
       {/* Карточки игроков */}
       <div style={styles.players}>
-        <PlayerCard user={myUser}     label="Вы"       symbol="X" active={isMyTurn  && phase === "playing"} phase={phase} />
+        <PlayerCard user={myUser}   label="Вы"       symbol={mySymbol}                        active={isMyTurn  && phase === "playing"} phase={phase} />
         <div style={{ fontSize: 24, alignSelf: "center" }}>VS</div>
-        <PlayerCard user={opponent}   label="Соперник" symbol="O" active={!isMyTurn && phase === "playing"} phase={phase} />
+        <PlayerCard user={opponent} label="Соперник" symbol={mySymbol === "X" ? "O" : "X"}   active={!isMyTurn && phase === "playing"} phase={phase} />
       </div>
 
       {/* Статус */}
@@ -308,6 +357,7 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
             const row = Math.floor(i / 3);
             const col = i % 3;
             const clickable = isMyTurn && phase === "playing" && cell === null && !isMakingMove;
+            const sym = getCellSymbol(cell);
             return (
               <div
                 key={i}
@@ -315,20 +365,22 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
                 style={{
                   width: ONLINE_CELL,
                   height: ONLINE_CELL,
-                  border: "2px solid #333",
+                  border: `2px solid ${cell !== null ? "transparent" : "#2d3f55"}`,
                   borderRadius: 8,
                   fontSize: Math.floor(ONLINE_CELL * 0.55),
+                  fontWeight: 900,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   cursor: clickable ? "pointer" : "default",
                   background: getCellColor(cell),
+                  color: sym === "X" ? "#60a5fa" : "#f87171",
                   userSelect: "none",
-                  boxShadow: "0 3px 6px rgba(0,0,0,0.12)",
+                  boxShadow: "0 3px 6px rgba(0,0,0,0.3)",
                   transition: "background 0.15s",
                 }}
               >
-                {getCellSymbol(cell)}
+                {sym}
               </div>
             );
           })}
