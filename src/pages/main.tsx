@@ -1,4 +1,4 @@
-import React, { FC, useState } from "react";
+import React, { FC, useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { Layout } from "antd";
 import SideMenu from "../components/sideMenu";
@@ -11,7 +11,16 @@ import { useStore } from "../store";
 const MainPage: FC = () => {
 	const [collapsed, setCollapsed] = useState(false);
 	const isAuthenticated = useStore((state) => state.isAuthenticated);
+	const [isPushing, setIsPushing] = useState(false);
+	useEffect(() => {
+		if (!isAuthenticated) {
+			setIsPushing(true);
+		}
+	}, [isAuthenticated]);
 	if (!isAuthenticated) {
+		return <Navigate to="/login" replace />;
+	}
+	if (isPushing) {
 		return <Navigate to="/login" replace />;
 	}
 	return (

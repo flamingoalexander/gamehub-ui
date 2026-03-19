@@ -39,7 +39,7 @@ type RefreshResponse = {
 };
 
 export const refresh = async () => {
-	const { data } = await $api.post<RefreshResponse>("/refresh/");
+	const { data } = await $api.post<RefreshResponse>("/token/refresh/");
 	return data;
 };
 
@@ -79,4 +79,14 @@ export const uploadAvatar = async (file: File): Promise<void> => {
 	formData.append("avatar", file);
 	const { data } = await $api.post("/me/avatar/", formData);
 	console.log(data);
+};
+
+export type Game = {
+	name: string;
+	description: string;
+	picture: string;
+};
+export const getGames = async (): Promise<Game[]> => {
+	const { data } = await $api.get<Game[]>("/game/all/");
+	return data;
 };

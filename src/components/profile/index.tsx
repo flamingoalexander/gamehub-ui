@@ -8,7 +8,7 @@ import {
 	Space,
 	Form,
 } from "antd";
-import { UserOutlined, MailOutlined } from "@ant-design/icons";
+import { UserOutlined } from "@ant-design/icons";
 import { useMutation } from "@tanstack/react-query";
 import { useStore } from "../../store";
 import { MePatchPayload } from "../../api";
@@ -64,7 +64,6 @@ const Profile: FC = () => {
 					<Descriptions.Item label={"Почта"}>
 						{userState.email}
 					</Descriptions.Item>
-					<Descriptions.Item label="Роль">{userState.email}</Descriptions.Item>
 					<Descriptions.Item label="О себе">
 						{userState.description}
 					</Descriptions.Item>
