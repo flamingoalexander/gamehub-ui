@@ -3,7 +3,6 @@ import { Navigate, Outlet } from "react-router-dom";
 import { Layout } from "antd";
 import SideMenu from "../components/sideMenu";
 import { Content } from "antd/es/layout/layout";
-import AppHeader from "../components/header";
 import Logo from "../components/logo";
 import Sider from "antd/es/layout/Sider";
 import { useStore } from "../store";
@@ -38,7 +37,7 @@ const MainPage: FC = () => {
 				<SideMenu />
 			</Sider>
 			<Layout>
-				<AppHeader />
+				{/*<AppHeader />*/}
 				<Content
 					style={{
 						margin: 16,

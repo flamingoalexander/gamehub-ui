@@ -90,3 +90,14 @@ export const getGames = async (): Promise<Game[]> => {
 	const { data } = await $api.get<Game[]>("/game/all/");
 	return data;
 };
+
+export type Leader = {
+	"#": number;
+	nickname: string;
+	total_achievs: number;
+	"achieve_%": number;
+};
+export const getLeaders = async (): Promise<Leader[]> => {
+	const { data } = await $api.get<Leader[]>("/leader_table/");
+	return data;
+};

@@ -44,9 +44,8 @@ export const GameCard: FC<GameCardProps> = ({
 							type="default"
 							icon={<CaretLeftOutlined />}
 							onClick={onPlay}
-							disabled={!canPlay}
 						>
-							Играть
+							{canPlay ? "Играть" : "В разработке"}
 						</Button>
 					</Flex>
 				</Col>
