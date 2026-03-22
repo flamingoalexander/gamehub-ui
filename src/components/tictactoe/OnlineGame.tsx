@@ -105,7 +105,7 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
 
   // ── Очистка WS при размонтировании ───────────────────────────────────────
   useEffect(() => {
-    return () => { socketRef.current?.disconnect(); console.log(123123);};
+    return () => { socketRef.current?.disconnect();};
   }, []);
 
   // ── Таймер: перерисовываем компонент каждую секунду ─────────────────────
