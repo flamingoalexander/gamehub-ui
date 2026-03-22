@@ -5,7 +5,7 @@ import type { ColumnsType } from "antd/es/table";
 import { getLeaders, Leader } from "../../api";
 import { useQuery } from "@tanstack/react-query";
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 
 const columns: ColumnsType<Leader> = [
 	{
@@ -13,6 +13,12 @@ const columns: ColumnsType<Leader> = [
 		dataIndex: "#",
 		key: "#",
 		width: 70,
+		render: (game) => {
+			if (game === 1) return <span style={{ fontSize: 24 }}>🥇</span>;
+			if (game === 2) return <span style={{ fontSize: 24 }}>🥈</span>;
+			if (game === 3) return <span style={{ fontSize: 24 }}>🥉</span>;
+			return <span style={{ marginLeft: 10, fontSize: 24 }}>{game}</span>;
+		},
 	},
 	{
 		title: "Никнейм игрока",
