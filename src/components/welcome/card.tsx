@@ -28,7 +28,7 @@ export const GameCard: FC<GameCardProps> = ({
 	achievementsText = "Достижений 0/0",
 	onPlay,
 }) => {
-	const canPlay = title === "Морской бой" || title === "Крестики нолики";
+	const canPlay = title === "Крестики нолики";
 	return (
 		<Card>
 			<Row gutter={16} align="top" wrap={false}>

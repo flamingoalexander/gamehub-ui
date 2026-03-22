@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Button } from "antd";
+import {Button, message} from "antd";
 
 import DrawWinLine from "../WinLine";
 import Point from "../scripts/TicTacToe/Point";
@@ -17,6 +17,7 @@ import {
 
 import styles from "./styles";
 import type { OnlinePhase, OnlineBoard } from "./types";
+import {useStore} from "../../store";
 
 // ─── Хелпер: победная линия ───────────────────────────────────────────────────
 
@@ -71,7 +72,7 @@ interface OnlineGameProps {
 
 const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
   const ONLINE_CELL = 120;
-
+  const store = useStore();
   const [phase, setPhase]               = useState<OnlinePhase>("searching");
   const [lobbyId, setLobbyId]           = useState<number | null>(null);
   const [board, setBoard]               = useState<OnlineBoard>(Array.from({ length: 3 }, () => Array(3).fill(null)));
@@ -104,7 +105,7 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
 
   // ── Очистка WS при размонтировании ───────────────────────────────────────
   useEffect(() => {
-    return () => { socketRef.current?.disconnect(); };
+    return () => { socketRef.current?.disconnect(); console.log(123123);};
   }, []);
 
   // ── Таймер: перерисовываем компонент каждую секунду ─────────────────────
@@ -141,7 +142,7 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
         setIsMyTurn(msg.is_your_turn);
         setPhase("playing");
         // Переключаемся с found_opponent → get_turn
-        socketRef.current?.disconnect();
+        //socketRef.current?.disconnect();
         const id = lobbyIdRef.current!;
         const sock = new TicTacToeSocket(id, "get_turn", handleWsMessage);
         sock.connect();
@@ -167,6 +168,13 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
         if (msg.winner && msg.winner !== 0)
           setWinningLine(findWinningLineOnline(msg.map, msg.winner, 3));
         setPhase("finished");
+        socketRef.current?.disconnect();
+        break;
+      }
+      case "opponent_disconnected": {
+        if (msg.user_email === store.email) break;
+        message.warning("Оппонент покинул игру");
+        onExit();
         break;
       }
       case "lobby_state": {
@@ -243,8 +251,6 @@ const OnlineGame: React.FC<OnlineGameProps> = ({ onExit, onError }) => {
       sock.connect();
       socketRef.current = sock;
     })();
-
-    return () => { socketRef.current?.disconnect(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -1,5 +1,7 @@
-const BASE_URL = process.env.REACT_APP_API_URL ?? "http://localhost:8000";
-const WS_BASE  = process.env.REACT_APP_WS_URL  ?? "ws://localhost:8000";
+import $api from "./api/instance";
+
+const BASE_URL = process.env.REACT_APP_API_URL ?? "http://91.132.58.57:8000";
+const WS_BASE  = process.env.REACT_APP_WS_URL  ?? "ws://91.132.58.57:8000";
 
 export const SEA_SIZE = 8;
 export const SHIP_LENGTHS = [4, 3, 2, 2, 1];
@@ -71,7 +73,7 @@ export type WsMessage = WsOpponentJoined | WsPlayerReady | WsShot | WsLobbyDelet
 function getToken() { return localStorage.getItem("accesstoken") ?? ""; }
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${path}`, {
     ...options,
     credentials: "include",
     headers: {
@@ -87,26 +89,34 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   return res.json() as Promise<T>;
 }
 
-export const sbGameStart = () =>
-  apiFetch<GameStartResponse>("/seabattle/game_start/", { method: "POST" });
+export const sbGameStart = async  () => {
+  const { data } = await $api.post("/seabattle/game_start/");
+  return data;
+}
 
-export const sbPlaceShips = (lobbyId: number, ships: Field) =>
-  apiFetch<PlaceShipsResponse>("/seabattle/place_ships/", {
-    method: "POST",
-    body: JSON.stringify({ lobby_id: lobbyId, ships }),
-  });
 
-export const sbShoot = (lobbyId: number, row: number, col: number) =>
-  apiFetch<ShootResponse>("/seabattle/shoot/", {
-    method: "POST",
-    body: JSON.stringify({ lobby_id: lobbyId, row, col }),
-  });
+export const sbPlaceShips = async (lobbyId: number, ships: Field) => {
+  const { data } = await $api.post("/seabattle/place_ships/", { lobby_id: lobbyId, ships });
+  return data;
+}
 
-export const sbDeleteLobby = (lobbyId: number) =>
-  apiFetch("/seabattle/delete_lobby/", {
+
+export const sbShoot = async (lobbyId: number, row: number, col: number) => {
+  const { data } = await $api.post("/seabattle/shoot/",{  lobby_id: lobbyId, row, col });
+  return data;
+}
+
+
+export const sbDeleteLobby = (lobbyId: number) => {
+  apiFetch("/api/seabattle/delete_lobby/", {
     method: "DELETE",
     body: JSON.stringify({ lobby_id: lobbyId }),
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+    }
   });
+}
+
 
 /**
  * POST /seabattle/leave_lobby/
@@ -114,13 +124,16 @@ export const sbDeleteLobby = (lobbyId: number) =>
  * Бэкенд удаляет лобби когда оба игрока покинули его.
  */
 export const sbLeaveLobby = (lobbyId: number) =>
-  apiFetch<{ status: string }>("/seabattle/leave_lobby/", {
+  apiFetch<{ status: string }>("/api/seabattle/leave_lobby/", {
     method: "POST",
     body: JSON.stringify({ lobby_id: lobbyId }),
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+    }
   });
 
 export const sbGetMe = () =>
-  apiFetch<UserInfo>("/seabattle/me/");
+  apiFetch<UserInfo>("/api/seabattle/me/");
 
 /**
  * POST /seabattle/forfeit/
@@ -129,7 +142,7 @@ export const sbGetMe = () =>
  * Если лобби уже удалено — возвращает { status: "already_deleted" }, это не ошибка.
  */
 export const sbForfeit = (lobbyId: number) =>
-  apiFetch<{ status: string }>("/seabattle/forfeit/", {
+  apiFetch<{ status: string }>("/api/seabattle/forfeit/", {
     method: "POST",
     body: JSON.stringify({ lobby_id: lobbyId }),
   });

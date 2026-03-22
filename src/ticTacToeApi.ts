@@ -1,7 +1,7 @@
 import $api from "./api/instance";
 
-const BASE_URL = process.env.REACT_APP_API_URL ?? "http://localhost:8000";
-const WS_BASE  = process.env.REACT_APP_WS_URL  ?? "ws://localhost:8000";
+const BASE_URL = process.env.REACT_APP_API_URL ?? "http://91.132.58.57:8000";
+const WS_BASE  = process.env.REACT_APP_WS_URL  ?? "ws://91.132.58.57:8000";
 
 export interface OpponentInfo {
   id: number;
@@ -60,7 +60,10 @@ export interface WsGameEnded {
   winner: number | null;
   map: (number | null)[][];
 }
-
+export interface WsOpponentDisconnected {
+  type: "opponent_disconnected";
+  user_email: string;
+}
 export interface WsLobbyState {
   type: "lobby_state";
   lobby_id: number;
@@ -68,7 +71,7 @@ export interface WsLobbyState {
   is_your_turn: boolean;
 }
 
-export type WsMessage = WsFoundOpponent | WsGetTurn | WsGameEnded | WsLobbyState;
+export type WsMessage = WsFoundOpponent | WsGetTurn | WsGameEnded | WsLobbyState | WsOpponentDisconnected;
 
 function getToken(): string {
   return localStorage.getItem("accesstoken") ?? "";

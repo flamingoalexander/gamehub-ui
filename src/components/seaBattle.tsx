@@ -535,7 +535,7 @@ const Battleship: React.FC = () => {
           : <span style={{ fontSize: 28 }}>👤</span>}
       </div>
       <div style={{ textAlign: "center" }}>
-        <div style={{ fontWeight: 600 }}>{label}</div>
+        <div style={{ fontWeight: 600, color: "black"}}>{label}</div>
         <div style={{ fontSize: 12, color: "#888" }}>{user?.email ?? "ожидание..."}</div>
         {ready !== undefined && (
           <div style={{ fontSize: 12, color: ready ? "#22a06b" : "#888", marginTop: 4 }}>

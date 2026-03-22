@@ -16,7 +16,6 @@ export const tokenStorage = {
 };
 
 export const login = async (credentials: Credentials) => {
-	console.log(credentials);
 	const { data } = await $api.post<LoginResponse>("/login/", credentials);
 	tokenStorage.set(data.access);
 };
@@ -78,7 +77,6 @@ export const uploadAvatar = async (file: File): Promise<void> => {
 	const formData = new FormData();
 	formData.append("avatar", file);
 	const { data } = await $api.post("/me/avatar/", formData);
-	console.log(data);
 };
 
 export type Game = {

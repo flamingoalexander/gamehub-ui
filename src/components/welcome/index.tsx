@@ -24,11 +24,9 @@ const Welcome: FC = () => {
 					<Col key={game.name} xs={24} sm={12}>
 						<Link
 							to={
-								game.name === "Морской бой"
-									? "/seabattle"
-									: game.name === "Крестики нолики"
-										? "/tictactoe"
-										: ""
+								game.name === "Крестики нолики"
+									? "/tictactoe"
+									: ""
 							}
 						>
 							<GameCard
