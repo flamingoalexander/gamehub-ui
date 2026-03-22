@@ -1,95 +1,82 @@
 import React, { useState } from "react";
-import { Button } from "antd";
 
-type Player = "X" | "O" | null;
+import LocalGame from "./tictactoe/LocalGame";
+import OnlineGame from "./tictactoe/OnlineGame";
+import styles from "./tictactoe/styles";
+import type { Mode } from "./tictactoe/types";
+
+// ─── Компонент ───────────────────────────────────────────────────────────────
 
 const TicTacToe: React.FC = () => {
-	const [board, setBoard] = useState<Player[]>(Array(9).fill(null));
-	const [isX, setIsX] = useState(true);
+  const [mode, setMode]               = useState<Mode>("menu");
+  const [onlineError, setOnlineError] = useState<string | null>(null);
 
-	const winner = calculateWinner(board);
+  // ── Меню ──────────────────────────────────────────────────────────────────
+  if (mode === "menu") {
+    return (
+      <div style={styles.container}>
+        <h2 style={{ fontSize: 28, marginBottom: 8 }}>Крестики-нолики</h2>
+        <p style={{ color: "#888", marginBottom: 24 }}>Выберите режим игры</p>
 
-	const handleClick = (index: number) => {
-		if (board[index] || winner) return;
+        {onlineError && (
+          <div style={styles.errorBox}>
+            ⚠️ {onlineError}
+            <button onClick={() => setOnlineError(null)} style={styles.closeBtn}>×</button>
+          </div>
+        )}
 
-		const newBoard = [...board];
-		newBoard[index] = isX ? "X" : "O";
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, width: 320 }}>
+          {/* Два игрока */}
+          <div style={styles.menuCard} onClick={() => setMode("local-pvp")}>
+            <span style={styles.menuIcon}>👥</span>
+            <div>
+              <div style={styles.menuTitle}>Два игрока</div>
+              <div style={styles.menuSub}>Играть вдвоём на одном устройстве</div>
+            </div>
+          </div>
 
-		setBoard(newBoard);
-		setIsX(!isX);
-	};
+          {/* Против компьютера */}
+          <div style={styles.menuCard} onClick={() => setMode("local-bot")}>
+            <span style={styles.menuIcon}>🤖</span>
+            <div>
+              <div style={styles.menuTitle}>Против компьютера</div>
+              <div style={styles.menuSub}>Сыграть против бота (поле 3×3)</div>
+            </div>
+          </div>
 
-	const reset = () => {
-		setBoard(Array(9).fill(null));
-		setIsX(true);
-	};
+          {/* Онлайн */}
+          <div style={styles.menuCard} onClick={() => setMode("online")}>
+            <span style={styles.menuIcon}>🌐</span>
+            <div>
+              <div style={styles.menuTitle}>Играть онлайн</div>
+              <div style={styles.menuSub}>Найти соперника в интернете</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-	return (
-		<div style={{ textAlign: "center" }}>
-			<h2>Крестики-нолики</h2>
+  // ── Локальная игра (PvP) ───────────────────────────────────────────────────
+  if (mode === "local-pvp") {
+    return <LocalGame mode="local-pvp" onExit={() => setMode("menu")} />;
+  }
 
-			<div
-				style={{
-					display: "grid",
-					gridTemplateColumns: "repeat(3, 80px)",
-					gap: 8,
-					justifyContent: "center",
-					marginBottom: 16,
-				}}
-			>
-				{board.map((cell, i) => (
-					<div
-						key={i}
-						onClick={() => handleClick(i)}
-						style={{
-							width: 80,
-							height: 80,
-							border: "1px solid #333",
-							fontSize: 32,
-							display: "flex",
-							alignItems: "center",
-							justifyContent: "center",
-							cursor: "pointer",
-							background: "#fff",
-						}}
-					>
-						{cell}
-					</div>
-				))}
-			</div>
+  // ── Локальная игра (vs Bot) ────────────────────────────────────────────────
+  if (mode === "local-bot") {
+    return <LocalGame mode="local-bot" onExit={() => setMode("menu")} />;
+  }
 
-			<h3>
-				{winner
-					? `Победитель: ${winner}`
-					: board.every(Boolean)
-						? "Ничья"
-						: `Ход: ${isX ? "X" : "O"}`}
-			</h3>
-
-			<Button onClick={reset}>Сброс</Button>
-		</div>
-	);
+  // ── Онлайн-игра ───────────────────────────────────────────────────────────
+  return (
+    <OnlineGame
+      onExit={() => setMode("menu")}
+      onError={(msg) => {
+        setOnlineError(msg);
+        setMode("menu");
+      }}
+    />
+  );
 };
-
-function calculateWinner(board: Player[]): Player {
-	const lines = [
-		[0, 1, 2],
-		[3, 4, 5],
-		[6, 7, 8],
-		[0, 3, 6],
-		[1, 4, 7],
-		[2, 5, 8],
-		[0, 4, 8],
-		[2, 4, 6],
-	];
-
-	for (const [a, b, c] of lines) {
-		if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-			return board[a];
-		}
-	}
-
-	return null;
-}
 
 export default TicTacToe;

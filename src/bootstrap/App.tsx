@@ -1,3 +1,4 @@
+import React from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import SeaBattle from "../components/seaBattle";
 import Welcome from "../components/welcome";
@@ -30,7 +31,6 @@ const App = () => {
 				<Route path="/achievements" element={<AchievementsPage />} />
 				<Route path="/leaderboard" element={<Leaderboard />} />
 			</Route>
-
 			<Route path="*" element={<Navigate to="/" replace />} />
 		</Routes>
 	);
