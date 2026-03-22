@@ -1,3 +1,5 @@
+import $api from "./api/instance";
+
 const BASE_URL = process.env.REACT_APP_API_URL ?? "http://localhost:8000";
 const WS_BASE  = process.env.REACT_APP_WS_URL  ?? "ws://localhost:8000";
 
@@ -75,7 +77,6 @@ function getToken(): string {
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
-    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${getToken()}`,
@@ -89,22 +90,19 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   return res.json() as Promise<T>;
 }
 
-export function gameStart(boardSize: number, winLength: number): Promise<GameStartResponse> {
-  return apiFetch<GameStartResponse>("/tictactoe/game_start/", {
-    method: "POST",
-    body: JSON.stringify({ board_size: boardSize, win_length: winLength }),
-  });
+export async  function gameStart(boardSize: number, winLength: number): Promise<GameStartResponse> {
+  const { data } = await $api.post("/tictactoe/game_start/", { board_size: boardSize, win_length: winLength });
+  return data;
 }
 
-export function makeTurn(lobbyId: number, row: number, col: number): Promise<MakeTurnResponse> {
-  return apiFetch<MakeTurnResponse>("/tictactoe/make_turn/", {
-    method: "POST",
-    body: JSON.stringify({ lobby_id: lobbyId, row, col }),
-  });
+export async function makeTurn(lobbyId: number, row: number, col: number): Promise<MakeTurnResponse> {
+  const { data } = await $api.post("/tictactoe/make_turn/", { lobby_id: lobbyId, row, col });
+  return data;
 }
 
-export function getCurrentUser(): Promise<CurrentUserResponse> {
-  return apiFetch<CurrentUserResponse>("/tictactoe/me/");
+export async function getCurrentUser(): Promise<CurrentUserResponse> {
+  const { data } = await $api.get("/tictactoe/me/");
+  return data;
 }
 
 export type WsEventHandler = (msg: WsMessage) => void;

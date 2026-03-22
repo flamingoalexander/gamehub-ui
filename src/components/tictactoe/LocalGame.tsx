@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Button, Select } from "antd";
 
 import TicTacToeChars from "../scripts/TicTacToe/TicTacToeCharsEnum";
-import DrawWinLine from "../winLine";
+import DrawWinLine from "../WinLine";
 
 import { useLocalGame } from "./localGameUtils";
 import styles from "./styles";

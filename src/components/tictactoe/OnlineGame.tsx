@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "antd";
 
-import DrawWinLine from "../winLine";
+import DrawWinLine from "../WinLine";
 import Point from "../scripts/TicTacToe/Point";
 
 import {
@@ -50,7 +50,7 @@ const PlayerCard: React.FC<{
       }
     </div>
     <div style={{ textAlign: "center" }}>
-      <div style={{ fontWeight: 600 }}>{label}</div>
+      <div style={{ fontWeight: 600, color: "black" }}>{label}</div>
       <div style={{ fontSize: 12, color: "#888" }}>
         {user
           ? user.email
